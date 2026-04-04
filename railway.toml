@@ -1,6 +1,6 @@
 [build]
 builder = "nixpacks"
-buildCommand = "npm ci && npm run build"
+buildCommand = "npm run build"
 
 [deploy]
 startCommand = "npm start"
@@ -8,9 +8,6 @@ healthcheckPath = "/health"
 healthcheckTimeout = 10
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
-
-[nixpacks]
-aptPkgs = ["python3", "python3-dev", "build-essential"]
 
 [nixpacks.variables]
 NIXPACKS_NODE_VERSION = "20"

@@ -37,7 +37,7 @@ function createOAuth2Client() {
   );
 }
 
-// Google ログイン画面へリダイレクト
+// Google ログイン画面へ（LINE内ブラウザ対策でHTML経由）
 auth.get("/auth/start", (c) => {
   const userId = c.req.query("user");
   if (!userId) {
@@ -48,13 +48,68 @@ auth.get("/auth/start", (c) => {
 
   const oauth2Client = createOAuth2Client();
   const state = JSON.stringify({ userId, label });
-  const url = oauth2Client.generateAuthUrl({
+  const googleAuthUrl = oauth2Client.generateAuthUrl({
     access_type: "offline",
     scope: SCOPES,
     prompt: "consent",
     state,
   });
-  return c.redirect(url);
+
+  return c.html(`<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Googleアカウント連携</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+      background: #f5f5f5;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 32px 24px;
+      max-width: 400px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    }
+    .icon { font-size: 48px; margin-bottom: 16px; }
+    h1 { font-size: 20px; margin-bottom: 12px; color: #333; }
+    p { font-size: 14px; color: #666; line-height: 1.6; margin-bottom: 24px; }
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 16px;
+      font-size: 16px;
+      font-weight: bold;
+      color: #fff;
+      background: #34a853;
+      border: none;
+      border-radius: 12px;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .note { font-size: 12px; color: #aaa; margin-top: 16px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">🔗</div>
+    <h1>Googleアカウント連携</h1>
+    <p>LINEのブラウザではGoogleログインができません。<br>下のボタンをタップしてSafariで開いてください。</p>
+    <a class="btn" href="${googleAuthUrl}">Safariで開く</a>
+    <p class="note">SafariまたはChromeが開きます</p>
+  </div>
+</body>
+</html>`);
 });
 
 // コールバック: トークンをDBに保存

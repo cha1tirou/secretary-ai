@@ -308,6 +308,38 @@ async function handleMessage(
   const userId = messageEvent.source.userId;
   if (!userId) return;
 
+  // Gmailアドレスを送ってきた場合 → テストユーザー登録フロー
+  const emailMatch = text.match(/^[\w.+-]+@[\w-]+\.[\w.]+$/);
+  if (emailMatch) {
+    const email = emailMatch[0];
+    const adminUrl = process.env["ADMIN_SERVER_URL"] ?? "";
+    const adminSecret = process.env["ADMIN_SECRET"] ?? "";
+
+    await client.replyMessage({
+      replyToken: messageEvent.replyToken,
+      messages: [{ type: "text", text: `\uD83D\uDCE7 ${email} \u3092\u78BA\u8A8D\u3057\u307E\u3057\u305F\u3002\u767B\u9332\u51E6\u7406\u4E2D\u3067\u3059...` }],
+    });
+
+    try {
+      const res = await fetch(`${adminUrl}/add-test-user`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-secret": adminSecret,
+        },
+        body: JSON.stringify({ email, userId }),
+      });
+      if (!res.ok) throw new Error(`Admin server error: ${res.status}`);
+    } catch (err) {
+      console.error("[webhook] admin server error:", err);
+      await client.pushMessage({
+        to: userId,
+        messages: [{ type: "text", text: "\u767B\u9332\u306B\u5931\u6557\u3057\u307E\u3057\u305F\u3002\u7BA1\u7406\u8005\u306B\u9023\u7D61\u3057\u3066\u304F\u3060\u3055\u3044\u3002" }],
+      });
+    }
+    return;
+  }
+
   // pending_reply の操作（「送信」「保留」「キャンセル」）
   const pendingMatch = text.match(/^(送信|保留|キャンセル)\s*#?(\d+)$/);
   if (pendingMatch) {

@@ -43,7 +43,8 @@ async function handleMessage(
   messageEvent: MessageEvent,
   text: string,
 ) {
-  const userId = messageEvent.source.userId ?? process.env["LINE_USER_ID"] ?? "default";
+  const userId = messageEvent.source.userId;
+  if (!userId) return;
 
   // pending_reply の操作（「送信」「保留」「キャンセル」）
   const pendingMatch = text.match(/^(送信|保留|キャンセル)\s*#?(\d+)$/);
@@ -138,12 +139,13 @@ webhook.post("/webhook", async (c) => {
         const userId = event.source.userId;
         if (!userId) return;
         upsertUser(userId, undefined, "trial");
-        const authUrl = `${process.env["GOOGLE_REDIRECT_URI"]?.replace("/auth/callback", "")}/auth/start`;
+        const baseUrl = process.env["GOOGLE_REDIRECT_URI"]?.replace("/auth/callback", "") ?? "";
+        const authUrl = `${baseUrl}/auth/start?user=${userId}&label=アカウント1`;
         await client.pushMessage({
           to: userId,
           messages: [{
             type: "text",
-            text: `はじめまして！AI秘書です。\n\n7日間、全機能を無料でお試しいただけます。\n\nまずGoogleアカウントと連携してください\n→ ${authUrl}\n\n連携後にできること：\nカレンダーの確認・登録\nメールの確認・返信提案\nタスク管理\n毎朝のブリーフィング\n\nなにかあればいつでも話しかけてください！`,
+            text: `AI秘書へようこそ！まずGoogleアカウントを連携してください。\n→ ${authUrl}\n\n複数アカウントがある場合はラベルを変えて何度でも追加できます`,
           }],
         });
         return;

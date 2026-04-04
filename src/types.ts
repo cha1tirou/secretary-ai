@@ -3,10 +3,13 @@ export type Email = {
   threadId: string;
   from: string;
   to: string;
+  cc: string;
   subject: string;
   body: string;
   date: string;
   isUnread: boolean;
+  listUnsubscribe: string;
+  listId: string;
 };
 
 export type CalendarEvent = {
@@ -32,6 +35,16 @@ export type User = {
   briefingHour: number;
   createdAt: string;
   updatedAt: string;
+};
+
+export type GoogleAccount = {
+  id: number;
+  userId: string;
+  label: string;
+  email: string | null;
+  gmailToken: string | null;
+  gcalToken: string | null;
+  createdAt: string;
 };
 
 export type PendingReply = {

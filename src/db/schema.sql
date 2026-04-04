@@ -30,8 +30,8 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS processed_emails (
   message_id   TEXT PRIMARY KEY,                 -- [PG] VARCHAR(255) PRIMARY KEY
   user_id      TEXT NOT NULL,
-  category     TEXT DEFAULT 'other'
-               CHECK(category IN ('reply_urgent','reply_later','important_info','newsletter','other')),
+  category     TEXT DEFAULT 'fyi'
+               CHECK(category IN ('urgent_reply','reply_later','action_needed','fyi','newsletter')),
   processed_at DATETIME DEFAULT CURRENT_TIMESTAMP -- [PG] TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -47,6 +47,18 @@ CREATE TABLE IF NOT EXISTS tasks (
               CHECK(status IN ('todo','done','cancelled')),
   notified_at TEXT,                               -- [PG] TIMESTAMPTZ
   created_at  TEXT DEFAULT (datetime('now','localtime')) -- [PG] TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS google_accounts (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT, -- [PG] SERIAL PRIMARY KEY
+  user_id     TEXT NOT NULL,                     -- [PG] VARCHAR(255)
+  label       TEXT NOT NULL DEFAULT 'default',
+  email       TEXT,
+  gmail_token TEXT,                               -- [PG] JSONB推奨
+  gcal_token  TEXT,                               -- [PG] JSONB推奨
+  created_at  DATETIME DEFAULT CURRENT_TIMESTAMP, -- [PG] TIMESTAMPTZ DEFAULT NOW()
+  FOREIGN KEY (user_id) REFERENCES users(user_id),
+  UNIQUE(user_id, label)                         -- [PG] そのままOK
 );
 
 CREATE TABLE IF NOT EXISTS pending_replies (

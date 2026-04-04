@@ -9,12 +9,13 @@ const isDev = process.env["NODE_ENV"] === "development";
 type BriefingContext = {
   events: CalendarEvent[];
   emails: Email[];
-  importantInfoSubjects: string[];
+  fyiSubjects: string[];
+  actionNeededSubjects: string[];
   newsletterCount: number;
 };
 
 function buildPrompt(ctx: BriefingContext): string {
-  const { events, emails, importantInfoSubjects, newsletterCount } = ctx;
+  const { events, emails, fyiSubjects, actionNeededSubjects, newsletterCount } = ctx;
   const eventSection =
     events.length === 0
       ? "今日の予定はありません。"
@@ -53,15 +54,18 @@ ${eventSection}
 ## 未読メール (${emails.length}件)
 ${emailSection}
 
-## 重要なお知らせ (${importantInfoSubjects.length}件)
-${importantInfoSubjects.length === 0 ? "なし" : importantInfoSubjects.map((s) => `- ${s}`).join("\n")}
+## FYI (${fyiSubjects.length}件)
+${fyiSubjects.length === 0 ? "なし" : fyiSubjects.map((s) => `- ${s}`).join("\n")}
+
+## 要対応 (${actionNeededSubjects.length}件)
+${actionNeededSubjects.length === 0 ? "なし" : actionNeededSubjects.map((s) => `- ${s}`).join("\n")}
 
 ## メルマガ・広告
 ${newsletterCount}件`;
 }
 
 function mockBriefing(ctx: BriefingContext): string {
-  const { events, emails, importantInfoSubjects, newsletterCount } = ctx;
+  const { events, emails, fyiSubjects, actionNeededSubjects, newsletterCount } = ctx;
   const date = new Date().toLocaleDateString("ja-JP", {
     month: "long",
     day: "numeric",
@@ -94,13 +98,23 @@ function mockBriefing(ctx: BriefingContext): string {
     }
   }
 
-  if (importantInfoSubjects.length > 0) {
-    text += `\n【お知らせ ${importantInfoSubjects.length}件】\n`;
-    for (const s of importantInfoSubjects.slice(0, 3)) {
+  if (actionNeededSubjects.length > 0) {
+    text += `\n【要対応 ${actionNeededSubjects.length}件】\n`;
+    for (const s of actionNeededSubjects.slice(0, 3)) {
       text += `・${s}\n`;
     }
-    if (importantInfoSubjects.length > 3) {
-      text += `…他${importantInfoSubjects.length - 3}件\n`;
+    if (actionNeededSubjects.length > 3) {
+      text += `…他${actionNeededSubjects.length - 3}件\n`;
+    }
+  }
+
+  if (fyiSubjects.length > 0) {
+    text += `\n【FYI ${fyiSubjects.length}件】\n`;
+    for (const s of fyiSubjects.slice(0, 3)) {
+      text += `・${s}\n`;
+    }
+    if (fyiSubjects.length > 3) {
+      text += `…他${fyiSubjects.length - 3}件\n`;
     }
   }
 
@@ -117,20 +131,29 @@ async function buildContext(userId: string): Promise<BriefingContext> {
     getUnreadEmails(userId),
   ]);
 
-  // 今日のimportant_infoメールの件名一覧
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
-  const importantRows = getProcessedEmailsByCategory(userId, "important_info", todayStart.toISOString());
-  const importantInfoSubjects: string[] = [];
-  for (const row of importantRows) {
-    // processed_emailsにはsubjectがないので、未読メールから探す
+  const since = todayStart.toISOString();
+
+  // FYI メールの件名一覧
+  const fyiRows = getProcessedEmailsByCategory(userId, "fyi", since);
+  const fyiSubjects: string[] = [];
+  for (const row of fyiRows) {
     const match = emails.find((e) => e.id === row.messageId);
-    if (match) importantInfoSubjects.push(match.subject);
+    if (match) fyiSubjects.push(match.subject);
   }
 
-  const newsletterCount = countProcessedEmailsByCategory(userId, "newsletter", todayStart.toISOString());
+  // 要対応メールの件名一覧
+  const actionRows = getProcessedEmailsByCategory(userId, "action_needed", since);
+  const actionNeededSubjects: string[] = [];
+  for (const row of actionRows) {
+    const match = emails.find((e) => e.id === row.messageId);
+    if (match) actionNeededSubjects.push(match.subject);
+  }
 
-  return { events, emails, importantInfoSubjects, newsletterCount };
+  const newsletterCount = countProcessedEmailsByCategory(userId, "newsletter", since);
+
+  return { events, emails, fyiSubjects, actionNeededSubjects, newsletterCount };
 }
 
 export async function generateBriefing(userId: string): Promise<string> {

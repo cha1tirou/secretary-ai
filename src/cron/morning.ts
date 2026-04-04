@@ -1,7 +1,7 @@
 import cron from "node-cron";
 import { messagingApi } from "@line/bot-sdk";
 import { generateBriefing } from "../agents/briefing.js";
-import { getUser, getTrialDaysRemaining } from "../db/queries.js";
+import { getUser, getTrialDaysRemaining, getAllUserIds, getGoogleAccountsByUserId } from "../db/queries.js";
 
 function getClient() {
   return new messagingApi.MessagingApiClient({
@@ -9,19 +9,16 @@ function getClient() {
   });
 }
 
-async function sendMorningBriefing() {
-  const userId = process.env["LINE_USER_ID"];
-  if (!userId) {
-    console.error("[cron] LINE_USER_ID が未設定");
-    return;
-  }
+async function sendBriefingForUser(client: messagingApi.MessagingApiClient, userId: string) {
+  const accounts = getGoogleAccountsByUserId(userId);
+  if (accounts.length === 0) return; // Google未連携ユーザーはスキップ
+  const user = getUser(userId);
 
-  console.log(`[cron] ブリーフィング生成開始: ${new Date().toISOString()}`);
+  console.log(`[cron] ブリーフィング生成: userId=${userId}`);
   try {
     let text = await generateBriefing(userId);
 
     // trial残日数通知
-    const user = getUser(userId);
     if (user?.plan === "trial") {
       const remaining = getTrialDaysRemaining(userId);
       if (remaining <= 2 && remaining > 0) {
@@ -29,21 +26,32 @@ async function sendMorningBriefing() {
       }
     }
 
-    const client = getClient();
     await client.pushMessage({ to: userId, messages: [{ type: "text", text }] });
-    console.log("[cron] ブリーフィング送信完了");
+    console.log(`[cron] ブリーフィング送信完了: userId=${userId}`);
   } catch (err) {
-    console.error("[cron] ブリーフィング送信エラー:", err);
-    // CLAUDE.mdルール5: エラー時はLINEで通知
+    console.error(`[cron] ブリーフィング送信エラー (${userId}):`, err);
     try {
-      const client = getClient();
       await client.pushMessage({
         to: userId,
         messages: [{ type: "text", text: "ブリーフィングの生成に失敗しました。" }],
       });
     } catch {
-      console.error("[cron] エラー通知も失敗");
+      console.error(`[cron] エラー通知も失敗 (${userId})`);
     }
+  }
+}
+
+async function sendMorningBriefing() {
+  console.log(`[cron] ブリーフィング開始: ${new Date().toISOString()}`);
+  const userIds = getAllUserIds();
+  if (userIds.length === 0) {
+    console.log("[cron] 登録ユーザーなし");
+    return;
+  }
+
+  const client = getClient();
+  for (const userId of userIds) {
+    await sendBriefingForUser(client, userId);
   }
 }
 

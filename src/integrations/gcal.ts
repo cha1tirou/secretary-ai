@@ -1,9 +1,11 @@
 import { google } from "googleapis";
 import { getAuthedClient } from "./auth.js";
+import { getGoogleAccountsByUserId } from "../db/queries.js";
 import type { CalendarEvent } from "../types.js";
+import type { GoogleAccount } from "../types.js";
 
-async function getCalendarClient(userId: string) {
-  const auth = await getAuthedClient(userId, "gcalToken");
+async function getCalendarClient(userId: string, account?: GoogleAccount) {
+  const auth = await getAuthedClient(userId, "gcalToken", account);
   return google.calendar({ version: "v3", auth });
 }
 
@@ -18,31 +20,65 @@ function toCalendarEvent(item: any): CalendarEvent {
   };
 }
 
+async function getTodayEventsForAccount(
+  userId: string,
+  account?: GoogleAccount,
+): Promise<CalendarEvent[]> {
+  const calendar = await getCalendarClient(userId, account);
+
+  const now = new Date();
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000);
+
+  const res = await calendar.events.list({
+    calendarId: "primary",
+    timeMin: startOfDay.toISOString(),
+    timeMax: endOfDay.toISOString(),
+    singleEvents: true,
+    orderBy: "startTime",
+  });
+
+  return (res.data.items ?? [])
+    .map(toCalendarEvent)
+    .filter((e) => {
+      const eventStart = new Date(e.start).getTime();
+      return eventStart >= startOfDay.getTime();
+    });
+}
+
 export async function getTodayEvents(userId: string): Promise<CalendarEvent[]> {
   console.log(`[gcal] getTodayEvents: userId="${userId}"`);
+  const accounts = getGoogleAccountsByUserId(userId);
+
   try {
-    const calendar = await getCalendarClient(userId);
+    if (accounts.length === 0) {
+      const events = await getTodayEventsForAccount(userId);
+      console.log(`[gcal] getTodayEvents: ${events.length} events`);
+      return events;
+    }
 
-    const now = new Date();
-    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000);
+    const results = await Promise.allSettled(
+      accounts.map((acc) => getTodayEventsForAccount(userId, acc)),
+    );
 
-    const res = await calendar.events.list({
-      calendarId: "primary",
-      timeMin: startOfDay.toISOString(),
-      timeMax: endOfDay.toISOString(),
-      singleEvents: true,
-      orderBy: "startTime",
-    });
-    // 開始時刻が今日のものだけに絞る（日またぎ予定を除外）
-    const events = (res.data.items ?? [])
-      .map(toCalendarEvent)
-      .filter((e) => {
-        const eventStart = new Date(e.start).getTime();
-        return eventStart >= startOfDay.getTime();
-      });
-    console.log(`[gcal] getTodayEvents: ${events.length} events (raw: ${res.data.items?.length ?? 0})`);
+    const events: CalendarEvent[] = [];
+    const seenIds = new Set<string>();
+    for (const result of results) {
+      if (result.status === "fulfilled") {
+        for (const event of result.value) {
+          if (!seenIds.has(event.id)) {
+            seenIds.add(event.id);
+            events.push(event);
+          }
+        }
+      } else {
+        console.error("[gcal] アカウント取得エラー:", result.reason);
+      }
+    }
 
+    // 開始時刻順にソート
+    events.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+    console.log(`[gcal] getTodayEvents: ${events.length} events (${accounts.length} accounts)`);
     return events;
   } catch (err) {
     console.error("[gcal] getTodayEvents エラー:", err);
@@ -50,8 +86,11 @@ export async function getTodayEvents(userId: string): Promise<CalendarEvent[]> {
   }
 }
 
-export async function getWeekEvents(userId: string): Promise<CalendarEvent[]> {
-  const calendar = await getCalendarClient(userId);
+async function getWeekEventsForAccount(
+  userId: string,
+  account?: GoogleAccount,
+): Promise<CalendarEvent[]> {
+  const calendar = await getCalendarClient(userId, account);
 
   const now = new Date();
   const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -68,11 +107,42 @@ export async function getWeekEvents(userId: string): Promise<CalendarEvent[]> {
   return (res.data.items ?? []).map(toCalendarEvent);
 }
 
+export async function getWeekEvents(userId: string): Promise<CalendarEvent[]> {
+  const accounts = getGoogleAccountsByUserId(userId);
+
+  if (accounts.length === 0) {
+    return getWeekEventsForAccount(userId);
+  }
+
+  const results = await Promise.allSettled(
+    accounts.map((acc) => getWeekEventsForAccount(userId, acc)),
+  );
+
+  const events: CalendarEvent[] = [];
+  const seenIds = new Set<string>();
+  for (const result of results) {
+    if (result.status === "fulfilled") {
+      for (const event of result.value) {
+        if (!seenIds.has(event.id)) {
+          seenIds.add(event.id);
+          events.push(event);
+        }
+      }
+    }
+  }
+
+  events.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+  return events;
+}
+
 export async function createEvent(
   userId: string,
   params: { title: string; start: string; end: string; location?: string; description?: string },
 ): Promise<CalendarEvent> {
-  const calendar = await getCalendarClient(userId);
+  // 最初のアカウントに予定を作成
+  const accounts = getGoogleAccountsByUserId(userId);
+  const account = accounts.length > 0 ? accounts[0] : undefined;
+  const calendar = await getCalendarClient(userId, account);
 
   const requestBody: Record<string, unknown> = {
     summary: params.title,

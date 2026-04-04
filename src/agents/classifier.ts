@@ -151,46 +151,86 @@ export async function classifyIntent(text: string): Promise<ClassifyResult> {
   }
 }
 
-// ── メール分類 ──
+// ── メール分類（2フェーズ） ──
 
-const VALID_EMAIL_CATEGORIES: EmailCategory[] = [
-  "reply_urgent", "reply_later", "important_info", "newsletter", "other",
+const NEWSLETTER_FROM_PATTERNS = /no-?reply|noreply|newsletter|notification|donotreply|info@/i;
+const URGENT_KEYWORDS = /至急|ASAP|本日中|今日中|緊急|urgent/i;
+
+const VALID_PERSONAL_CATEGORIES: EmailCategory[] = [
+  "reply_later", "action_needed", "fyi",
 ];
 
-function classifyEmailByRegex(email: Email): EmailCategory {
-  const from = email.from.toLowerCase();
-  const subject = email.subject.toLowerCase();
-  const body = email.body.toLowerCase();
+/**
+ * フェーズ1: ルールベースの送信者フィルタ
+ * newsletter と判定できれば即確定、それ以外は null を返す
+ */
+function detectNewsletter(email: Email, userEmail?: string): boolean {
+  // List-Unsubscribe / List-Id ヘッダーの存在
+  if (email.listUnsubscribe || email.listId) return true;
 
-  if (/no-?reply|noreply|unsubscribe|配信停止|メルマガ/.test(from + subject + body)) {
-    return "newsletter";
+  // From に自動送信パターンを含む
+  if (NEWSLETTER_FROM_PATTERNS.test(email.from)) return true;
+
+  // To/CC に自分のアドレスが含まれない（BCC配信 = メルマガ）
+  if (userEmail) {
+    const addr = userEmail.toLowerCase();
+    const recipients = (email.to + " " + email.cc).toLowerCase();
+    if (!recipients.includes(addr)) return true;
   }
-  if (/urgent|至急|緊急|asap|急ぎ/.test(subject + body)) {
-    return "reply_urgent";
-  }
-  if (/ご確認|ご返信|ご回答|お返事|教えてください|ご連絡ください|please reply|please respond/.test(subject + body)) {
-    return "reply_later";
-  }
-  if (/お知らせ|通知|notice|announcement|更新|変更のお知らせ/.test(subject)) {
-    return "important_info";
-  }
-  return "other";
+
+  return false;
 }
 
-const EMAIL_SYSTEM_PROMPT = `あなたはメールを分類するアシスタントです。
-以下のカテゴリから最も適切なものを1つ選んでください。
+/**
+ * urgent キーワード検出（件名・本文）
+ * 該当すれば Haiku 不要で urgent_reply 確定
+ */
+function detectUrgent(email: Email): boolean {
+  return URGENT_KEYWORDS.test(email.subject + " " + email.body);
+}
 
-- reply_urgent: 返信が必要で急ぎ
-- reply_later: 返信が必要だが急がない
-- important_info: 返信不要だが重要なお知らせ
-- newsletter: メルマガ・広告
-- other: 上記に当てはまらない
+/**
+ * フェーズ2用の regex フォールバック（開発モード or LLM失敗時）
+ */
+function classifyPersonalByRegex(email: Email): EmailCategory {
+  const text = email.subject + " " + email.body;
+  if (/ご確認|ご返信|ご回答|お返事|教えてください|ご連絡ください|please reply|please respond/i.test(text)) {
+    return "reply_later";
+  }
+  if (/してください|をお願い|期日|締め切り|締切|deadline|提出/i.test(text)) {
+    return "action_needed";
+  }
+  return "fyi";
+}
+
+const PERSONAL_EMAIL_SYSTEM_PROMPT = `あなたはメールを分類するアシスタントです。
+このメールは個人から送られたメールです（メルマガ・自動送信ではありません）。
+以下の3カテゴリから最も適切なものを1つ選んでください。
+
+- reply_later: 返信が必要（数日以内でOK）
+- action_needed: 返信不要だが自分の行動が必要（締切・依頼等）
+- fyi: 読むだけでOK
 
 JSON形式で回答: {"category": "..."}`;
 
-export async function classifyEmail(email: Email): Promise<EmailCategory> {
+/**
+ * メール分類メイン関数
+ * フェーズ1（ルールベース）→ フェーズ2（Haiku 3択）の2段構成
+ */
+export async function classifyEmail(email: Email, userEmail?: string): Promise<EmailCategory> {
+  // フェーズ1: メルマガ判定
+  if (detectNewsletter(email, userEmail)) {
+    return "newsletter";
+  }
+
+  // urgent キーワード検出
+  if (detectUrgent(email)) {
+    return "urgent_reply";
+  }
+
+  // フェーズ2: 個人メールの3択分類
   if (isDev) {
-    return classifyEmailByRegex(email);
+    return classifyPersonalByRegex(email);
   }
 
   try {
@@ -198,7 +238,7 @@ export async function classifyEmail(email: Email): Promise<EmailCategory> {
     const message = await client.messages.create({
       model: "claude-haiku-4-5-20251001",
       max_tokens: 128,
-      system: EMAIL_SYSTEM_PROMPT,
+      system: PERSONAL_EMAIL_SYSTEM_PROMPT,
       messages: [{
         role: "user",
         content: `From: ${email.from}\nSubject: ${email.subject}\n\n${email.body.slice(0, 300)}`,
@@ -206,14 +246,14 @@ export async function classifyEmail(email: Email): Promise<EmailCategory> {
     });
 
     const block = message.content[0];
-    if (!block || block.type !== "text") return classifyEmailByRegex(email);
+    if (!block || block.type !== "text") return classifyPersonalByRegex(email);
 
     const parsed = JSON.parse(block.text) as { category: EmailCategory };
-    if (!VALID_EMAIL_CATEGORIES.includes(parsed.category)) return classifyEmailByRegex(email);
+    if (!VALID_PERSONAL_CATEGORIES.includes(parsed.category)) return classifyPersonalByRegex(email);
     return parsed.category;
   } catch (err) {
     console.error("[classifier] メール分類LLMエラー:", err);
-    return classifyEmailByRegex(email);
+    return classifyPersonalByRegex(email);
   }
 }
 

@@ -1,9 +1,11 @@
 import { google } from "googleapis";
 import { getAuthedClient } from "./auth.js";
+import { getGoogleAccountsByUserId } from "../db/queries.js";
 import type { Email } from "../types.js";
+import type { GoogleAccount } from "../types.js";
 
-async function getGmailClient(userId: string) {
-  const auth = await getAuthedClient(userId, "gmailToken");
+async function getGmailClient(userId: string, account?: GoogleAccount) {
+  const auth = await getAuthedClient(userId, "gmailToken", account);
   return google.gmail({ version: "v1", auth });
 }
 
@@ -47,8 +49,11 @@ function extractBody(payload: any): string {
   return "";
 }
 
-export async function getUnreadEmails(userId: string): Promise<Email[]> {
-  const gmail = await getGmailClient(userId);
+async function getUnreadEmailsForAccount(
+  userId: string,
+  account?: GoogleAccount,
+): Promise<Email[]> {
+  const gmail = await getGmailClient(userId, account);
 
   const list = await gmail.users.messages.list({
     userId: "me",
@@ -77,21 +82,56 @@ export async function getUnreadEmails(userId: string): Promise<Email[]> {
       threadId: threadId ?? "",
       from: extractHeader(headers, "From"),
       to: extractHeader(headers, "To"),
+      cc: extractHeader(headers, "Cc"),
       subject: extractHeader(headers, "Subject"),
       body: body.slice(0, 500),
       date: extractHeader(headers, "Date"),
       isUnread: true,
+      listUnsubscribe: extractHeader(headers, "List-Unsubscribe"),
+      listId: extractHeader(headers, "List-Id"),
     });
   }
 
   return emails;
 }
 
-export async function getSentEmails(
+export async function getUnreadEmails(userId: string): Promise<Email[]> {
+  const accounts = getGoogleAccountsByUserId(userId);
+
+  if (accounts.length === 0) {
+    // フォールバック: users テーブルのトークンを使用
+    return getUnreadEmailsForAccount(userId);
+  }
+
+  // 全アカウントから並行取得してマージ
+  const results = await Promise.allSettled(
+    accounts.map((acc) => getUnreadEmailsForAccount(userId, acc)),
+  );
+
+  const emails: Email[] = [];
+  const seenIds = new Set<string>();
+  for (const result of results) {
+    if (result.status === "fulfilled") {
+      for (const email of result.value) {
+        if (!seenIds.has(email.id)) {
+          seenIds.add(email.id);
+          emails.push(email);
+        }
+      }
+    } else {
+      console.error("[gmail] アカウント取得エラー:", result.reason);
+    }
+  }
+
+  return emails;
+}
+
+async function getSentEmailsForAccount(
   userId: string,
-  maxResults = 10,
+  maxResults: number,
+  account?: GoogleAccount,
 ): Promise<Email[]> {
-  const gmail = await getGmailClient(userId);
+  const gmail = await getGmailClient(userId, account);
 
   const list = await gmail.users.messages.list({
     userId: "me",
@@ -120,11 +160,44 @@ export async function getSentEmails(
       threadId: threadId ?? "",
       from: extractHeader(headers, "From"),
       to: extractHeader(headers, "To"),
+      cc: extractHeader(headers, "Cc"),
       subject: extractHeader(headers, "Subject"),
       body: body.slice(0, 500),
       date: extractHeader(headers, "Date"),
       isUnread: false,
+      listUnsubscribe: extractHeader(headers, "List-Unsubscribe"),
+      listId: extractHeader(headers, "List-Id"),
     });
+  }
+
+  return emails;
+}
+
+export async function getSentEmails(
+  userId: string,
+  maxResults = 10,
+): Promise<Email[]> {
+  const accounts = getGoogleAccountsByUserId(userId);
+
+  if (accounts.length === 0) {
+    return getSentEmailsForAccount(userId, maxResults);
+  }
+
+  const results = await Promise.allSettled(
+    accounts.map((acc) => getSentEmailsForAccount(userId, maxResults, acc)),
+  );
+
+  const emails: Email[] = [];
+  const seenIds = new Set<string>();
+  for (const result of results) {
+    if (result.status === "fulfilled") {
+      for (const email of result.value) {
+        if (!seenIds.has(email.id)) {
+          seenIds.add(email.id);
+          emails.push(email);
+        }
+      }
+    }
   }
 
   return emails;
@@ -134,7 +207,27 @@ export async function getThread(
   threadId: string,
   userId: string,
 ): Promise<Email[]> {
-  const gmail = await getGmailClient(userId);
+  const accounts = getGoogleAccountsByUserId(userId);
+
+  // 各アカウントでスレッド取得を試みる（スレッドは1アカウントにしか存在しない）
+  for (const account of accounts) {
+    try {
+      return await getThreadForAccount(threadId, userId, account);
+    } catch {
+      // このアカウントにはスレッドがない、次へ
+    }
+  }
+
+  // フォールバック: users テーブルのトークン
+  return getThreadForAccount(threadId, userId);
+}
+
+async function getThreadForAccount(
+  threadId: string,
+  userId: string,
+  account?: GoogleAccount,
+): Promise<Email[]> {
+  const gmail = await getGmailClient(userId, account);
 
   const thread = await gmail.users.threads.get({
     userId: "me",
@@ -154,10 +247,13 @@ export async function getThread(
       threadId: thread.data.id ?? "",
       from: extractHeader(headers, "From"),
       to: extractHeader(headers, "To"),
+      cc: extractHeader(headers, "Cc"),
       subject: extractHeader(headers, "Subject"),
       body,
       date: extractHeader(headers, "Date"),
       isUnread: labelIds.includes("UNREAD"),
+      listUnsubscribe: extractHeader(headers, "List-Unsubscribe"),
+      listId: extractHeader(headers, "List-Id"),
     };
   });
 }
@@ -169,8 +265,32 @@ export async function sendReply(
   subject: string,
   body: string,
 ): Promise<string> {
-  const gmail = await getGmailClient(userId);
+  const accounts = getGoogleAccountsByUserId(userId);
 
+  // スレッドが存在するアカウントから送信を試みる
+  for (const account of accounts) {
+    try {
+      const gmail = await getGmailClient(userId, account);
+      // スレッドの存在確認
+      await gmail.users.threads.get({ userId: "me", id: threadId, format: "minimal" });
+      return await sendReplyWithClient(gmail, threadId, to, subject, body);
+    } catch {
+      // このアカウントにはスレッドがない、次へ
+    }
+  }
+
+  // フォールバック: デフォルトアカウント
+  const gmail = await getGmailClient(userId);
+  return sendReplyWithClient(gmail, threadId, to, subject, body);
+}
+
+async function sendReplyWithClient(
+  gmail: ReturnType<typeof google.gmail>,
+  threadId: string,
+  to: string,
+  subject: string,
+  body: string,
+): Promise<string> {
   const subjectLine = subject.startsWith("Re:") ? subject : `Re: ${subject}`;
   const raw = [
     `To: ${to}`,

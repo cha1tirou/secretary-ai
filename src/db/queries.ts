@@ -2,7 +2,7 @@ import Database from "better-sqlite3";
 import { readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { User, PendingReply, Task, Plan } from "../types.js";
+import type { User, GoogleAccount, PendingReply, Task, Plan } from "../types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -45,6 +45,26 @@ export function initDb(): void {
   // [PG] ALTER TABLE ... DROP CONSTRAINT + ADD CONSTRAINT で CHECK変更可能
   // マイグレーション: pending_replies の status に 'hold' を許可
   // SQLite は CHECK 制約の変更不可なので、既存テーブルはそのまま（新規作成時のみ反映）
+
+  // マイグレーション: メール分類カテゴリの変更 (reply_urgent→urgent_reply, important_info→action_needed, other→fyi)
+  d.exec("UPDATE processed_emails SET category = 'urgent_reply' WHERE category = 'reply_urgent'");
+  d.exec("UPDATE processed_emails SET category = 'action_needed' WHERE category = 'important_info'");
+  d.exec("UPDATE processed_emails SET category = 'fyi' WHERE category = 'other'");
+
+  // マイグレーション: users.gmail_token → google_accounts に移行
+  const usersWithToken = d.prepare(
+    "SELECT user_id, gmail_token, gcal_token FROM users WHERE gmail_token IS NOT NULL",
+  ).all() as { user_id: string; gmail_token: string | null; gcal_token: string | null }[];
+  for (const row of usersWithToken) {
+    const existing = d.prepare(
+      "SELECT 1 FROM google_accounts WHERE user_id = ? AND label = 'default'",
+    ).get(row.user_id);
+    if (!existing) {
+      d.prepare(
+        "INSERT INTO google_accounts (user_id, label, gmail_token, gcal_token) VALUES (?, 'default', ?, ?)",
+      ).run(row.user_id, row.gmail_token, row.gcal_token);
+    }
+  }
 }
 
 // ── Users ──
@@ -130,6 +150,44 @@ export function updateWritingStyle(userId: string, style: string): void {
     .run(style, userId);
 }
 
+export function getAllUserIds(): string[] {
+  const rows = getDb()
+    .prepare("SELECT user_id FROM users")
+    .all() as { user_id: string }[];
+  return rows.map((r) => r.user_id);
+}
+
+// ── Google Accounts ──
+
+export function getGoogleAccountsByUserId(userId: string): GoogleAccount[] {
+  return getDb()
+    .prepare(
+      `SELECT id, user_id AS userId, label, email, gmail_token AS gmailToken,
+        gcal_token AS gcalToken, created_at AS createdAt
+       FROM google_accounts WHERE user_id = ? ORDER BY created_at ASC`,
+    )
+    .all(userId) as GoogleAccount[];
+}
+
+export function upsertGoogleAccount(
+  userId: string,
+  label: string,
+  email: string | null,
+  gmailToken: string,
+  gcalToken: string,
+): void {
+  getDb()
+    .prepare(
+      `INSERT INTO google_accounts (user_id, label, email, gmail_token, gcal_token)
+       VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT(user_id, label) DO UPDATE SET
+         email = excluded.email,
+         gmail_token = excluded.gmail_token,
+         gcal_token = excluded.gcal_token`,
+    )
+    .run(userId, label, email, gmailToken, gcalToken);
+}
+
 // ── Conversations ──
 
 export function addConversation(
@@ -195,7 +253,7 @@ export function updatePendingReplyStatus(
 
 // ── Processed Emails ──
 
-export type EmailCategory = "reply_urgent" | "reply_later" | "important_info" | "newsletter" | "other";
+export type EmailCategory = "urgent_reply" | "reply_later" | "action_needed" | "fyi" | "newsletter";
 
 export function isEmailProcessed(messageId: string): boolean {
   const row = getDb()
@@ -204,7 +262,7 @@ export function isEmailProcessed(messageId: string): boolean {
   return row !== undefined;
 }
 
-export function markEmailProcessed(messageId: string, userId: string, category: EmailCategory = "other"): void {
+export function markEmailProcessed(messageId: string, userId: string, category: EmailCategory = "fyi"): void {
   getDb()
     .prepare(
       "INSERT OR IGNORE INTO processed_emails (message_id, user_id, category) VALUES (?, ?, ?)", // [PG] INSERT ... ON CONFLICT DO NOTHING

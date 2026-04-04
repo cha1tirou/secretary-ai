@@ -5,6 +5,8 @@ import { generateReply } from "../agents/reply.js";
 import { classifyEmail, extractTasksFromEmail } from "../agents/classifier.js";
 import {
   getDb,
+  getAllUserIds,
+  getGoogleAccountsByUserId,
   isEmailProcessed,
   markEmailProcessed,
   createPendingReply,
@@ -62,41 +64,39 @@ async function draftAndNotify(
 
 // ── 5分おき: 新着メール分類 + urgent即通知 ──
 
-async function checkNewEmails() {
-  const userId = process.env["LINE_USER_ID"];
-  if (!userId) return;
-
-  console.log(`[auto-draft] チェック開始: ${new Date().toISOString()}`);
-
+async function checkNewEmailsForUser(client: messagingApi.MessagingApiClient, userId: string) {
   try {
     const emails = await getUnreadEmails(userId);
     const newEmails = emails.filter((e) => !isEmailProcessed(e.id));
 
-    if (newEmails.length === 0) {
-      console.log("[auto-draft] 新着なし");
-      return;
-    }
+    if (newEmails.length === 0) return;
 
-    console.log(`[auto-draft] ${newEmails.length}件の新着メール`);
-    const client = getClient();
+    console.log(`[auto-draft] ${userId}: ${newEmails.length}件の新着メール`);
+
+    // ユーザーのメールアドレスを取得（メルマガ判定のTo/CCチェック用）
+    const accounts = getGoogleAccountsByUserId(userId);
+    const userEmails = accounts
+      .map((a) => a.email)
+      .filter((e): e is string => e !== null);
+    const userEmail = userEmails[0];
 
     for (const email of newEmails.slice(0, 10)) {
       try {
-        const category = await classifyEmail(email);
+        const category = await classifyEmail(email, userEmail);
         markEmailProcessed(email.id, userId, category);
         console.log(`[auto-draft] ${email.subject} → ${category}`);
 
-        // urgent は即座にドラフト生成・通知
-        if (category === "reply_urgent") {
+        // urgent_reply → 即時LINE通知 + 返信案生成
+        if (category === "urgent_reply") {
           await draftAndNotify(client, email, userId, "【急ぎ】返信案:");
         }
 
-        // タスク自動抽出
-        if (category !== "newsletter" && category !== "other") {
+        // action_needed → タスク化提案
+        if (category === "action_needed") {
           try {
             const tasks = await extractTasksFromEmail(email);
             for (const t of tasks) {
-              const taskId = createTask(userId, t.title, undefined, t.dueDate, "email", email.id);
+              createTask(userId, t.title, undefined, t.dueDate, "email", email.id);
               await client.pushMessage({
                 to: userId,
                 messages: [{
@@ -104,7 +104,7 @@ async function checkNewEmails() {
                   text: `タスクを検出しました\n${t.title}${t.dueDate ? `\n期日: ${t.dueDate}` : ""}\n\n自動でタスクに追加しました。\n「タスク見せて」で確認できます。`,
                 }],
               });
-              console.log(`[auto-draft] タスク検���: ${t.title}`);
+              console.log(`[auto-draft] タスク検出: ${t.title}`);
             }
           } catch (taskErr) {
             console.error(`[auto-draft] タスク抽出エラー (${email.id}):`, taskErr);
@@ -112,54 +112,67 @@ async function checkNewEmails() {
         }
       } catch (err) {
         console.error(`[auto-draft] 分類エラー (${email.id}):`, err);
-        markEmailProcessed(email.id, userId, "other");
+        markEmailProcessed(email.id, userId, "fyi");
       }
     }
   } catch (err) {
-    console.error("[auto-draft] チェックエラー:", err);
+    console.error(`[auto-draft] チェックエラー (${userId}):`, err);
+  }
+}
+
+async function checkNewEmails() {
+  console.log(`[auto-draft] チェック開始: ${new Date().toISOString()}`);
+  const userIds = getAllUserIds();
+  if (userIds.length === 0) return;
+
+  const client = getClient();
+  for (const userId of userIds) {
+    const accounts = getGoogleAccountsByUserId(userId);
+    if (accounts.length === 0) continue; // Google未連携はスキップ
+    await checkNewEmailsForUser(client, userId);
   }
 }
 
 // ── 1日3回 (10時/15時/19時): reply_later まとめ通知 ──
 
-async function notifyReplyLater() {
-  const userId = process.env["LINE_USER_ID"];
-  if (!userId) return;
-
-  console.log(`[auto-draft] reply_later まとめ通知: ${new Date().toISOString()}`);
-
+async function notifyReplyLaterForUser(client: messagingApi.MessagingApiClient, userId: string) {
   try {
     const emails = await getUnreadEmails(userId);
-    // reply_laterとして分類済みで、まだ未読のメールを探す
     const replyLaterEmails = emails.filter((e) => {
       if (!isEmailProcessed(e.id)) return false;
-      // processed_emailsからcategoryを取得
       const row = getDb()
         .prepare("SELECT category FROM processed_emails WHERE message_id = ?")
         .get(e.id) as { category: string } | undefined;
       return row?.category === "reply_later";
     });
 
-    if (replyLaterEmails.length === 0) {
-      console.log("[auto-draft] reply_later 対象なし");
-      return;
-    }
-
-    const client = getClient();
+    if (replyLaterEmails.length === 0) return;
 
     for (const email of replyLaterEmails.slice(0, 5)) {
       try {
         await draftAndNotify(client, email, userId, "返信案:");
-        // 通知済みとしてcategoryを更新（再通知防止）
         getDb()
-          .prepare("UPDATE processed_emails SET category = 'other' WHERE message_id = ?")
+          .prepare("UPDATE processed_emails SET category = 'fyi' WHERE message_id = ?")
           .run(email.id);
       } catch (err) {
         console.error(`[auto-draft] reply_later ドラフトエラー (${email.id}):`, err);
       }
     }
   } catch (err) {
-    console.error("[auto-draft] reply_later まとめ通知エラー:", err);
+    console.error(`[auto-draft] reply_later まとめ通知エラー (${userId}):`, err);
+  }
+}
+
+async function notifyReplyLater() {
+  console.log(`[auto-draft] reply_later まとめ通知: ${new Date().toISOString()}`);
+  const userIds = getAllUserIds();
+  if (userIds.length === 0) return;
+
+  const client = getClient();
+  for (const userId of userIds) {
+    const accounts = getGoogleAccountsByUserId(userId);
+    if (accounts.length === 0) continue;
+    await notifyReplyLaterForUser(client, userId);
   }
 }
 

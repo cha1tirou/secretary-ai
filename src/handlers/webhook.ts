@@ -402,7 +402,7 @@ webhook.post("/webhook", async (c) => {
         if (!userId) return;
         upsertUser(userId, undefined, "trial");
         const baseUrl = getBaseUrl();
-        const authUrl = `${baseUrl}/auth/start?user=${userId}`;
+        const authUrl = `${baseUrl}/auth/start?user=${userId}&label=${encodeURIComponent("アカウント1")}`;
         const messages = buildWelcomeMessages(userId, authUrl);
         // LINE push は1回5通まで。4通なのでまとめて送信
         await client.pushMessage({ to: userId, messages });

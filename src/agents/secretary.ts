@@ -13,7 +13,9 @@ import {
   getRecentConversations,
   updateUserPlan,
   getTrialDaysRemaining,
+  getGoogleAccountsByUserId,
 } from "../db/queries.js";
+import { ReauthRequiredError, buildAuthUrl } from "../integrations/auth.js";
 import type { Plan } from "../types.js";
 import type { CalendarEvent } from "../types.js";
 
@@ -559,6 +561,14 @@ export async function handleWithSecretary(
   userId: string,
   userText: string,
 ): Promise<string> {
+  // Google未連携チェック
+  const accounts = getGoogleAccountsByUserId(userId);
+  const user = getUser(userId);
+  if (accounts.length === 0 && !user?.gmailToken) {
+    const authUrl = buildAuthUrl(userId);
+    return `Googleアカウントがまだ連携されていません。\n以下のリンクから連携してください👇\n${authUrl}`;
+  }
+
   // プランチェック
   const { plan, trialWarning } = checkPlan(userId);
   console.log(`[secretary] plan=${plan} user=${userId}`);
@@ -570,15 +580,22 @@ export async function handleWithSecretary(
 
   let result: string;
 
-  if (plan === "light") {
-    // Light plan: 定型コマンドのみ（Sonnet不使用、コスト約0.04円）
-    console.log(`[secretary] lightPlanProcessor`);
-    result = await lightPlanProcessor(userId, userText);
-    addConversation(userId, "user", userText, "light");
-    addConversation(userId, "assistant", result);
-  } else {
-    // trial / pro → 常にSonnet + Tool Use（コスト約1.5〜4.5円）
-    result = await proAgentLoop(userId, userText);
+  try {
+    if (plan === "light") {
+      // Light plan: 定型コマンドのみ（Sonnet不使用、コスト約0.04円）
+      console.log(`[secretary] lightPlanProcessor`);
+      result = await lightPlanProcessor(userId, userText);
+      addConversation(userId, "user", userText, "light");
+      addConversation(userId, "assistant", result);
+    } else {
+      // trial / pro → 常にSonnet + Tool Use（コスト約1.5〜4.5円）
+      result = await proAgentLoop(userId, userText);
+    }
+  } catch (err) {
+    if (err instanceof ReauthRequiredError) {
+      return `Googleアカウントの認証が切れています。\n再連携してください👇\n${err.authUrl}`;
+    }
+    throw err;
   }
 
   // trial残日数警告を追記

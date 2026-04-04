@@ -1,7 +1,24 @@
 import { Hono } from "hono";
 import { google } from "googleapis";
-import { upsertUser, upsertGoogleAccount, getGoogleAccountsByUserId } from "../db/queries.js";
+import { upsertUser, upsertGoogleAccount, getGoogleAccountsByUserId, deleteGoogleAccountsByUserId } from "../db/queries.js";
 import type { GoogleAccount } from "../types.js";
+
+export function buildAuthUrl(userId: string): string {
+  const baseUrl = (process.env["GOOGLE_REDIRECT_URI"] ?? "")
+    .replace("/auth/callback", "")
+    || "https://web-production-b2798.up.railway.app";
+  return `${baseUrl}/auth/start?user=${userId}&label=${encodeURIComponent("アカウント1")}`;
+}
+
+export class ReauthRequiredError extends Error {
+  public readonly authUrl: string;
+  constructor(userId: string, reason: string) {
+    const authUrl = buildAuthUrl(userId);
+    super(reason);
+    this.name = "ReauthRequiredError";
+    this.authUrl = authUrl;
+  }
+}
 
 const auth = new Hono();
 
@@ -137,21 +154,30 @@ export async function getAuthedClient(
   const expiry = tokens.expiry_date as number | undefined;
   if (expiry && expiry < Date.now() + 60_000) {
     console.log("[auth] token expired, refreshing");
-    const { credentials } = await oauth2Client.refreshAccessToken();
-    oauth2Client.setCredentials(credentials);
-    const updated = JSON.stringify(credentials);
+    try {
+      const { credentials } = await oauth2Client.refreshAccessToken();
+      oauth2Client.setCredentials(credentials);
+      const updated = JSON.stringify(credentials);
 
-    // google_accounts を更新
-    if (account) {
-      const { upsertGoogleAccount } = await import("../db/queries.js");
-      const dbField = tokenField === "gmailToken" ? "gmail_token" : "gcal_token";
-      // 両方同じトークンを使っているのでまとめて更新
-      upsertGoogleAccount(account.userId, account.label, account.email, updated, updated);
-    } else {
-      updateUserTokens(userId, { [tokenField]: updated } as {
-        gmailToken?: string;
-        gcalToken?: string;
-      });
+      // google_accounts を更新
+      if (account) {
+        const { upsertGoogleAccount } = await import("../db/queries.js");
+        upsertGoogleAccount(account.userId, account.label, account.email, updated, updated);
+      } else {
+        updateUserTokens(userId, { [tokenField]: updated } as {
+          gmailToken?: string;
+          gcalToken?: string;
+        });
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (/invalid_grant|Token has been expired|Token has been revoked/i.test(msg)) {
+        console.error(`[auth] token refresh failed (${userId}): ${msg}`);
+        deleteGoogleAccountsByUserId(userId);
+        updateUserTokens(userId, { gmailToken: null, gcalToken: null });
+        throw new ReauthRequiredError(userId, msg);
+      }
+      throw err;
     }
   }
 

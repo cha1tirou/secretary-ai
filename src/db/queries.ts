@@ -124,7 +124,7 @@ export function getUser(userId: string): User | undefined {
 
 export function updateUserTokens(
   userId: string,
-  tokens: { gmailToken?: string; gcalToken?: string },
+  tokens: { gmailToken?: string | null; gcalToken?: string | null },
 ): void {
   if (tokens.gmailToken !== undefined) {
     getDb()
@@ -186,6 +186,12 @@ export function upsertGoogleAccount(
          gcal_token = excluded.gcal_token`,
     )
     .run(userId, label, email, gmailToken, gcalToken);
+}
+
+export function deleteGoogleAccountsByUserId(userId: string): void {
+  getDb()
+    .prepare("DELETE FROM google_accounts WHERE user_id = ?")
+    .run(userId);
 }
 
 // ── Conversations ──

@@ -58,12 +58,23 @@ auth.get("/auth/start", (c) => {
   const escapedUrl = googleAuthUrl.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
   const jsUrl = googleAuthUrl.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
 
+  // All Japanese text uses Unicode escapes to prevent mojibake in template literals
+  const title = "Google\u30A2\u30AB\u30A6\u30F3\u30C8\u9023\u643A"; // Googleアカウント連携
+  const step1 = "\u300C\u0055\u0052\u004C\u3092\u30B3\u30D4\u30FC\u300D\u30DC\u30BF\u30F3\u3092\u30BF\u30C3\u30D7"; // 「URLをコピー」ボタンをタップ
+  const step2 = "iPhone\u306ESafari\u3092\u958B\u304F"; // iPhoneのSafariを開く
+  const step3 = "\u30A2\u30C9\u30EC\u30B9\u30D0\u30FC\u306B\u8CBC\u308A\u4ED8\u3051\u3066\u30A2\u30AF\u30BB\u30B9"; // アドレスバーに貼り付けてアクセス
+  const step4 = "Google\u30ED\u30B0\u30A4\u30F3\u5B8C\u4E86\u5F8C\u3001LINE\u306B\u623B\u308B"; // Googleログイン完了後、LINEに戻る
+  const btnLabel = "URL\u3092\u30B3\u30D4\u30FC"; // URLをコピー
+  const copiedLabel = "\u30B3\u30D4\u30FC\u3057\u307E\u3057\u305F\uFF01\u2713"; // コピーしました！✓
+  const fallbackLabel = "URL\u3092\u9078\u629E\u3057\u307E\u3057\u305F \u2014 \u9577\u62BC\u3057\u3067\u30B3\u30D4\u30FC"; // URLを選択しました — 長押しでコピー
+  const stepsTitle = "\u624B\u9806"; // 手順
+
   return c.html(`<!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Googleアカウント連携</title>
+  <title>${title}</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -75,12 +86,38 @@ auth.get("/auth/start", (c) => {
       justify-content: center;
       padding: 24px;
     }
-    .card {
-      max-width: 400px;
-      width: 100%;
-    }
+    .card { max-width: 400px; width: 100%; }
     .icon { font-size: 48px; text-align: center; margin-bottom: 16px; }
     h1 { font-size: 20px; text-align: center; margin-bottom: 20px; color: #333; }
+    .steps {
+      background: #f9f9f9;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    .steps h2 { font-size: 14px; color: #333; margin-bottom: 12px; }
+    .step {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin-bottom: 10px;
+      font-size: 14px;
+      color: #444;
+      line-height: 1.5;
+    }
+    .step:last-child { margin-bottom: 0; }
+    .step-num {
+      background: #06C755;
+      color: #fff;
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: bold;
+      flex-shrink: 0;
+    }
     .btn {
       display: block;
       width: 100%;
@@ -106,59 +143,29 @@ auth.get("/auth/start", (c) => {
       line-height: 1.5;
       user-select: all;
       -webkit-user-select: all;
-      margin-bottom: 24px;
-    }
-    .steps {
-      background: #f9f9f9;
-      border-radius: 12px;
-      padding: 20px;
-    }
-    .steps h2 { font-size: 14px; color: #333; margin-bottom: 12px; }
-    .step {
-      display: flex;
-      align-items: flex-start;
-      gap: 10px;
-      margin-bottom: 10px;
-      font-size: 14px;
-      color: #444;
-      line-height: 1.5;
-    }
-    .step:last-child { margin-bottom: 0; }
-    .step-num {
-      background: #06C755;
-      color: #fff;
-      width: 22px;
-      height: 22px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 12px;
-      font-weight: bold;
-      flex-shrink: 0;
     }
   </style>
 </head>
 <body>
   <div class="card">
-    <div class="icon">🔗</div>
-    <h1>Googleアカウント連携</h1>
-    <button class="btn" id="copyBtn" onclick="copyUrl()">コピーして開く</button>
-    <div class="url-box" id="urlText">${escapedUrl}</div>
+    <div class="icon">\uD83D\uDD17</div>
+    <h1>${title}</h1>
     <div class="steps">
-      <h2>手順</h2>
-      <div class="step"><span class="step-num">1</span><span>上のボタンでURLを���ピー</span></div>
-      <div class="step"><span class="step-num">2</span><span>iPhoneのSafariを開く</span></div>
-      <div class="step"><span class="step-num">3</span><span>アドレスバーに貼り付けてアクセス</span></div>
-      <div class="step"><span class="step-num">4</span><span>Googleログイン完��後、LINEに戻る</span></div>
+      <h2>${stepsTitle}</h2>
+      <div class="step"><span class="step-num">1</span><span>${step1}</span></div>
+      <div class="step"><span class="step-num">2</span><span>${step2}</span></div>
+      <div class="step"><span class="step-num">3</span><span>${step3}</span></div>
+      <div class="step"><span class="step-num">4</span><span>${step4}</span></div>
     </div>
+    <button class="btn" id="copyBtn" onclick="copyUrl()">${btnLabel}</button>
+    <div class="url-box" id="urlText">${escapedUrl}</div>
   </div>
   <script>
     function copyUrl() {
       var btn = document.getElementById('copyBtn');
       navigator.clipboard.writeText('${jsUrl}')
         .then(function() {
-          btn.textContent = 'コピーしました！✓';
+          btn.textContent = '${copiedLabel}';
           btn.style.background = '#888';
         })
         .catch(function() {
@@ -167,7 +174,7 @@ auth.get("/auth/start", (c) => {
           var sel = window.getSelection();
           sel.removeAllRanges();
           sel.addRange(range);
-          btn.textContent = 'URLを選択しました — 長押しでコピー';
+          btn.textContent = '${fallbackLabel}';
           btn.style.background = '#888';
         });
     }

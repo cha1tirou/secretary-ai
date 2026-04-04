@@ -55,6 +55,9 @@ auth.get("/auth/start", (c) => {
     state,
   });
 
+  const escapedUrl = googleAuthUrl.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+  const jsUrl = googleAuthUrl.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+
   return c.html(`<!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -65,7 +68,7 @@ auth.get("/auth/start", (c) => {
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
-      background: #f5f5f5;
+      background: #fff;
       min-height: 100vh;
       display: flex;
       align-items: center;
@@ -73,17 +76,11 @@ auth.get("/auth/start", (c) => {
       padding: 24px;
     }
     .card {
-      background: #fff;
-      border-radius: 16px;
-      padding: 32px 24px;
       max-width: 400px;
       width: 100%;
-      text-align: center;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
     }
-    .icon { font-size: 48px; margin-bottom: 16px; }
-    h1 { font-size: 20px; margin-bottom: 12px; color: #333; }
-    p { font-size: 14px; color: #666; line-height: 1.6; margin-bottom: 24px; }
+    .icon { font-size: 48px; text-align: center; margin-bottom: 16px; }
+    h1 { font-size: 20px; text-align: center; margin-bottom: 20px; color: #333; }
     .btn {
       display: block;
       width: 100%;
@@ -91,23 +88,90 @@ auth.get("/auth/start", (c) => {
       font-size: 16px;
       font-weight: bold;
       color: #fff;
-      background: #34a853;
+      background: #06C755;
       border: none;
       border-radius: 12px;
-      text-decoration: none;
+      text-align: center;
       cursor: pointer;
+      margin-bottom: 16px;
     }
-    .note { font-size: 12px; color: #aaa; margin-top: 16px; }
+    .url-box {
+      background: #f5f5f5;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 11px;
+      word-break: break-all;
+      color: #333;
+      line-height: 1.5;
+      user-select: all;
+      -webkit-user-select: all;
+      margin-bottom: 24px;
+    }
+    .steps {
+      background: #f9f9f9;
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .steps h2 { font-size: 14px; color: #333; margin-bottom: 12px; }
+    .step {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin-bottom: 10px;
+      font-size: 14px;
+      color: #444;
+      line-height: 1.5;
+    }
+    .step:last-child { margin-bottom: 0; }
+    .step-num {
+      background: #06C755;
+      color: #fff;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: bold;
+      flex-shrink: 0;
+    }
   </style>
 </head>
 <body>
   <div class="card">
     <div class="icon">🔗</div>
     <h1>Googleアカウント連携</h1>
-    <p>LINEのブラウザではGoogleログインができません。<br>下のボタンをタップしてSafariで開いてください。</p>
-    <a class="btn" href="${googleAuthUrl}">Safariで開く</a>
-    <p class="note">SafariまたはChromeが開きます</p>
+    <button class="btn" id="copyBtn" onclick="copyUrl()">コピーして開く</button>
+    <div class="url-box" id="urlText">${escapedUrl}</div>
+    <div class="steps">
+      <h2>手順</h2>
+      <div class="step"><span class="step-num">1</span><span>上のボタンでURLを���ピー</span></div>
+      <div class="step"><span class="step-num">2</span><span>iPhoneのSafariを開く</span></div>
+      <div class="step"><span class="step-num">3</span><span>アドレスバーに貼り付けてアクセス</span></div>
+      <div class="step"><span class="step-num">4</span><span>Googleログイン完��後、LINEに戻る</span></div>
+    </div>
   </div>
+  <script>
+    function copyUrl() {
+      var btn = document.getElementById('copyBtn');
+      navigator.clipboard.writeText('${jsUrl}')
+        .then(function() {
+          btn.textContent = 'コピーしました！✓';
+          btn.style.background = '#888';
+        })
+        .catch(function() {
+          var range = document.createRange();
+          range.selectNodeContents(document.getElementById('urlText'));
+          var sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(range);
+          btn.textContent = 'URLを選択しました — 長押しでコピー';
+          btn.style.background = '#888';
+        });
+    }
+  </script>
 </body>
 </html>`);
 });

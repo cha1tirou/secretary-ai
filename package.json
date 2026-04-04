@@ -1,0 +1,32 @@
+{
+  "name": "secretary-ai",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc && cp src/db/schema.sql dist/db/schema.sql",
+    "start": "node dist/server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.82.0",
+    "@hono/node-server": "^1.19.12",
+    "@line/bot-sdk": "^10.6.0",
+    "better-sqlite3": "^12.8.0",
+    "dotenv": "^17.4.0",
+    "googleapis": "^171.4.0",
+    "hono": "^4.12.10",
+    "node-cron": "^4.2.1"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^25.5.2",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.2"
+  }
+}

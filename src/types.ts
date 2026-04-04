@@ -1,0 +1,60 @@
+export type Email = {
+  id: string;
+  threadId: string;
+  from: string;
+  to: string;
+  subject: string;
+  body: string;
+  date: string;
+  isUnread: boolean;
+};
+
+export type CalendarEvent = {
+  id: string;
+  summary: string;
+  description: string;
+  start: string;
+  end: string;
+  location: string;
+};
+
+export type Plan = "trial" | "light" | "pro" | "expired";
+
+export type User = {
+  userId: string;
+  displayName: string | null;
+  plan: Plan;
+  trialStartDate: string | null;
+  planExpiresAt: string | null;
+  gmailToken: string | null;
+  gcalToken: string | null;
+  writingStyle: string | null;
+  briefingHour: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PendingReply = {
+  id: number;
+  userId: string;
+  threadId: string;
+  toAddress: string;
+  subject: string;
+  draftContent: string;
+  status: "pending" | "hold" | "sent" | "cancelled" | "modified";
+  createdAt: string;
+  sentAt: string | null;
+};
+
+export type Task = {
+  id: number;
+  userId: string;
+  title: string;
+  description: string | null;
+  dueDate: string | null;
+  source: string;
+  sourceId: string | null;
+  status: "todo" | "done" | "cancelled";
+  notifiedAt: string | null;
+  createdAt: string;
+};

@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI秘書 — LINEで話しかけるだけ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;700;900&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#111009;--paper:#F6F3EE;--green:#2A5C3F;--green-l:#3D7A59;--gold:#B8922A;--muted:#7A7669;--line:#06C755;--surface:#EFECE6}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:'DM Sans',sans-serif;background:var(--paper);color:var(--ink);overflow-x:hidden;-webkit-font-smoothing:antialiased}
+.nav{display:flex;justify-content:space-between;align-items:center;padding:28px clamp(20px,6vw,80px);border-bottom:1px solid rgba(17,16,9,.08)}
+.logo{font-family:'Noto Serif JP',serif;font-weight:900;font-size:20px;letter-spacing:-.02em}
+.logo span{color:var(--green)}
+.tag{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);border:1px solid currentColor;padding:5px 12px;border-radius:100px}
+.hero{min-height:90vh;padding:0 clamp(20px,6vw,80px);display:grid;grid-template-columns:1fr auto;align-items:center;gap:40px;overflow:hidden;position:relative}
+.hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 60% 60% at 70% 40%,rgba(42,92,63,.05),transparent 70%);pointer-events:none}
+.hero-body{padding:80px 0;max-width:640px}
+.eyebrow{display:inline-flex;align-items:center;gap:10px;font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--green);margin-bottom:28px;opacity:0;animation:up .7s .1s forwards}
+.eyebrow::before{content:'';width:28px;height:1px;background:var(--green)}
+h1{font-family:'Noto Serif JP',serif;font-weight:900;font-size:clamp(40px,6.5vw,80px);line-height:1.08;letter-spacing:-.03em;margin-bottom:28px;opacity:0;animation:up .7s .25s forwards}
+h1 em{font-style:normal;color:var(--green)}
+.hero-copy{font-size:clamp(15px,1.8vw,18px);font-weight:300;line-height:1.8;color:var(--muted);margin-bottom:40px;opacity:0;animation:up .7s .4s forwards}
+.cta-row{display:flex;align-items:center;gap:16px;flex-wrap:wrap;opacity:0;animation:up .7s .55s forwards}
+.btn-line{display:inline-flex;align-items:center;gap:10px;background:var(--line);color:#fff;font-size:15px;font-weight:500;padding:15px 28px;border-radius:6px;text-decoration:none;transition:transform .2s,box-shadow .2s;box-shadow:0 4px 20px rgba(6,199,85,.28)}
+.btn-line:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(6,199,85,.38)}
+.btn-line svg{width:22px;height:22px;flex-shrink:0}
+.cta-note{font-size:12px;color:var(--muted);font-weight:300}
+.phone-wrap{opacity:0;animation:right .9s .7s forwards;flex-shrink:0}
+@media(max-width:860px){.phone-wrap{display:none}.hero{grid-template-columns:1fr}}
+.phone{width:278px;background:#1C1C1E;border-radius:44px;padding:14px;box-shadow:0 40px 80px rgba(0,0,0,.28),0 0 0 1px rgba(255,255,255,.08);animation:bob 5s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+.screen{background:#f2f2f7;border-radius:32px;overflow:hidden}
+.chat-bar{background:var(--line);padding:14px 18px;display:flex;align-items:center;gap:10px}
+.chat-av{width:34px;height:34px;background:rgba(255,255,255,.22);border-radius:50%;display:grid;place-items:center;font-size:16px}
+.chat-nm{color:#fff;font-size:14px;font-weight:500}
+.msgs{background:#e9e9ef;padding:14px 12px;display:flex;flex-direction:column;gap:9px;min-height:420px}
+.m{font-size:12.5px;line-height:1.55;padding:9px 13px;border-radius:17px;max-width:85%;opacity:0}
+.mb{background:#fff;border-bottom-left-radius:4px;align-self:flex-start;animation:pop .35s forwards}
+.mu{background:var(--line);color:#fff;border-bottom-right-radius:4px;align-self:flex-end;animation:pop .35s forwards}
+.m:nth-child(1){animation-delay:1.4s}.m:nth-child(2){animation-delay:2.3s}.m:nth-child(3){animation-delay:3.1s}.m:nth-child(4){animation-delay:3.9s}.m:nth-child(5){animation-delay:4.7s}
+@keyframes pop{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.divider{height:1px;background:linear-gradient(90deg,transparent,rgba(17,16,9,.1),transparent);margin:0 clamp(20px,6vw,80px)}
+section{padding:clamp(60px,10vw,120px) clamp(20px,6vw,80px)}
+.sl{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--green);margin-bottom:16px}
+.st{font-family:'Noto Serif JP',serif;font-weight:900;font-size:clamp(28px,4.5vw,52px);line-height:1.1;letter-spacing:-.025em;margin-bottom:20px}
+.dark{background:var(--ink);color:var(--paper)}
+.dark .sl{color:var(--gold)}
+.fg{margin-top:56px;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.07)}
+.fc{padding:40px 32px;background:var(--ink);transition:background .25s;position:relative}
+.fc::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--green-l);transform:scaleX(0);transform-origin:left;transition:transform .3s}
+.fc:hover{background:rgba(255,255,255,.03)}.fc:hover::after{transform:scaleX(1)}
+.fn{font-size:11px;letter-spacing:.15em;color:rgba(246,243,238,.25);margin-bottom:18px}
+.fi{font-size:28px;margin-bottom:14px;display:block}
+.ft{font-family:'Noto Serif JP',serif;font-size:20px;font-weight:700;margin-bottom:10px}
+.fd{font-size:13.5px;font-weight:300;color:rgba(246,243,238,.5);line-height:1.8}
+.pro-tag{display:inline-block;margin-top:12px;font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:var(--gold);background:rgba(184,146,42,.12);padding:3px 8px;border-radius:100px}
+.why-g{margin-top:56px;display:grid;grid-template-columns:1fr 1fr;gap:32px;align-items:start}
+@media(max-width:720px){.why-g{grid-template-columns:1fr}}
+.why-c{background:var(--surface);border-radius:16px;padding:36px;border:1px solid rgba(17,16,9,.06)}
+.why-t{font-family:'Noto Serif JP',serif;font-size:22px;font-weight:700;margin-bottom:16px}
+.why-l{list-style:none;display:flex;flex-direction:column;gap:14px}
+.why-l li{font-size:14px;font-weight:300;color:var(--muted);line-height:1.7;display:flex;gap:10px;align-items:flex-start}
+.ck{width:18px;height:18px;border-radius:50%;background:rgba(42,92,63,.12);flex-shrink:0;margin-top:2px;display:inline-flex;align-items:center;justify-content:center}
+.ck svg{width:9px;height:9px;stroke:var(--green);stroke-width:2.5;fill:none}
+.sh{background:#fff;border-radius:12px;padding:26px;border:1px solid rgba(42,92,63,.15);display:flex;gap:14px;align-items:flex-start;margin-bottom:14px}
+.sh-ic{font-size:22px;flex-shrink:0;font-style:normal}
+.sh-tx{font-size:14px;font-weight:300;line-height:1.8;color:var(--muted)}
+.sh-tx strong{font-weight:500;color:var(--ink);display:block;margin-bottom:4px}
+.surf{background:var(--surface)}
+.steps{margin-top:56px;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:32px}
+.sn{width:52px;height:52px;border-radius:50%;border:1.5px solid var(--green);display:grid;place-items:center;font-family:'Noto Serif JP',serif;font-size:20px;font-weight:700;color:var(--green);margin-bottom:20px}
+.stit{font-family:'Noto Serif JP',serif;font-size:19px;font-weight:700;margin-bottom:10px}
+.sdesc{font-size:14px;font-weight:300;color:var(--muted);line-height:1.8}
+.snote{margin-top:8px;font-size:12px;color:var(--green);background:rgba(42,92,63,.07);padding:4px 10px;border-radius:100px;display:inline-block}
+.ex-g{margin-top:56px;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.ex{background:#fff;border-radius:14px;padding:28px;border:1px solid rgba(17,16,9,.06);transition:transform .25s,box-shadow .25s}
+.ex:hover{transform:translateY(-3px);box-shadow:0 12px 36px rgba(0,0,0,.07)}
+.eq{background:var(--line);color:#fff;padding:10px 14px;border-radius:10px 10px 4px 10px;font-size:13px;line-height:1.55;margin-bottom:12px}
+.ea{background:#F0F0F5;padding:10px 14px;border-radius:4px 10px 10px 10px;font-size:12.5px;color:#555;line-height:1.65}
+.etag{display:inline-block;margin-top:14px;font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--green);background:rgba(42,92,63,.07);padding:3px 9px;border-radius:100px}
+.epro{color:var(--gold);background:rgba(184,146,42,.1)}
+.pg{margin-top:56px;display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:20px;max-width:760px}
+.pc{border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:36px 32px;position:relative;transition:border-color .25s}
+.pc:hover{border-color:rgba(255,255,255,.2)}
+.pf{border-color:var(--green-l);background:rgba(61,122,89,.07)}
+.pb{position:absolute;top:-12px;left:28px;background:var(--green);color:#fff;font-size:10px;letter-spacing:.15em;text-transform:uppercase;padding:4px 12px;border-radius:100px}
+.pn{font-family:'Noto Serif JP',serif;font-size:22px;font-weight:700;margin-bottom:6px}
+.pp{font-size:42px;font-weight:300;letter-spacing:-.03em;line-height:1;margin-bottom:4px}
+.pp span{font-size:14px;font-weight:400;color:rgba(246,243,238,.4)}
+.pt{font-size:12px;color:var(--gold);margin-bottom:28px;font-weight:300}
+.pl{list-style:none;display:flex;flex-direction:column;gap:11px}
+.pl li{font-size:13.5px;font-weight:300;color:rgba(246,243,238,.65);display:flex;gap:10px;align-items:flex-start;line-height:1.45}
+.pl li::before{content:'✓';color:var(--green-l);font-weight:500;flex-shrink:0}
+.qr-sec{background:var(--surface)}
+.qr-inner{max-width:680px;margin:0 auto;text-align:center}
+.qr-inner p{font-size:15px;font-weight:300;color:var(--muted);margin-bottom:48px;line-height:1.8}
+.qr-layout{display:flex;align-items:center;justify-content:center;gap:48px;flex-wrap:wrap}
+.qr-box{background:#fff;border-radius:16px;padding:28px;border:1px solid rgba(17,16,9,.08);display:flex;flex-direction:column;align-items:center;gap:14px}
+.qr-ph{width:160px;height:160px;background:#f5f5f5;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;border:2px dashed rgba(17,16,9,.12)}
+.qr-ph p{font-size:11px;color:var(--muted);letter-spacing:.05em;text-align:center;line-height:1.5}
+.qr-lb{font-size:12px;color:var(--muted);font-weight:300}
+.or{font-size:14px;color:var(--muted);font-weight:300}
+footer{background:var(--ink);color:rgba(246,243,238,.3);text-align:center;padding:32px;font-size:12px;font-weight:300;letter-spacing:.05em}
+@keyframes up{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+@keyframes right{from{opacity:0;transform:translateX(30px)}to{opacity:1;transform:translateX(0)}}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="logo">AI<span>秘書</span></div>
+  <span class="tag">α版（先行体験）公開中</span>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-body">
+    <p class="eyebrow">α版 先行体験 · LINE × AI × Gmail × Calendar</p>
+    <h1>スマホの中に、<br><em>有能な秘書</em>が<br>一人いる。</h1>
+    <p class="hero-copy">メールの確認・返信提案、カレンダー管理、タスク追跡。<br>LINEで話しかけるだけで、全部動いてくれます。</p>
+    <div class="cta-row">
+      <a href="#start" class="btn-line">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63h2.386c.346 0 .627.285.627.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.105.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63.346 0 .628.285.628.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.281.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314"/></svg>
+        7日間 無料体験をはじめる
+      </a>
+      <span class="cta-note">登録不要・無料ではじめられます</span>
+    </div>
+  </div>
+  <div class="phone-wrap">
+    <div class="phone">
+      <div class="screen">
+        <div class="chat-bar">
+          <div class="chat-av">🤖</div>
+          <span class="chat-nm">AI秘書</span>
+        </div>
+        <div class="msgs">
+          <div class="m mb">おはようございます！<br>📅 今日4件 📧 要返信3件<br>10:00 チームMTG @A会議室</div>
+          <div class="m mu">山田さんからメール来てる？</div>
+          <div class="m mb">山田部長から2件あります<br>①「企画書の件」昨日 17:32<br>②「来週MTGについて」今朝<br>どちらに返信しますか？</div>
+          <div class="m mu">来週火曜の午後、空いてる？</div>
+          <div class="m mb">火曜 13:00〜17:00 空きあり✅<br>MTGを入れましょうか？</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+<div class="divider"></div>
+
+<!-- FEATURES -->
+<section class="dark">
+  <p class="sl">できること</p>
+  <h2 class="st">仕事に集中するための、<br>6つの機能。</h2>
+  <div class="fg">
+    <div class="fc"><div class="fn">01</div><i class="fi">🌅</i><h3 class="ft">朝のブリーフィング</h3><p class="fd">毎朝8時に、今日の予定・重要メール・タスクをまとめてLINEに届けます。1日を30秒で把握。</p></div>
+    <div class="fc"><div class="fn">02</div><i class="fi">📧</i><h3 class="ft">メール自動分類・返信提案</h3><p class="fd">AIが「急ぎ」「後で」「メルマガ」に自動仕分け。重要メールだけ通知して、返信文まで下書きします。</p></div>
+    <div class="fc"><div class="fn">03</div><i class="fi">📅</i><h3 class="ft">カレンダー管理</h3><p class="fd">「来週火曜午後に田中さんとMTG入れて」と話すだけ。空き時間の確認から登録まで一気に完了。</p></div>
+    <div class="fc"><div class="fn">04</div><i class="fi">✅</i><h3 class="ft">タスク管理・リマインド</h3><p class="fd">メールからタスクを自動検出・保存。期日前のリマインドも。「今日やること」で一覧をすぐ確認。</p></div>
+    <div class="fc"><div class="fn">05</div><i class="fi">💬</i><h3 class="ft">自由な対話</h3><p class="fd">「山田部長の件、要約して返信案を作って」など、複雑な指示も自然な会話でこなします。</p><span class="pro-tag">Pro プランのみ</span></div>
+    <div class="fc"><div class="fn">06</div><i class="fi">🔒</i><h3 class="ft">安全なGoogle連携</h3><p class="fd">OAuth2で安全に接続。パスワードは不要。メール・カレンダー以外のデータにはアクセスしません。</p></div>
+  </div>
+</section>
+
+<!-- WHY GOOGLE -->
+<section>
+  <p class="sl">Google連携について</p>
+  <h2 class="st">なぜGoogleアカウントと<br>連携するのですか？</h2>
+  <div class="why-g">
+    <div class="why-c">
+      <h3 class="why-t">使用する権限と目的</h3>
+      <ul class="why-l">
+        <li>
+          <span class="ck"><svg viewBox="0 0 10 10"><polyline points="2,5 4,7.5 8,2.5"/></svg></span>
+          <span><strong style="font-weight:500;color:var(--ink)">Gmailの読み取り・送信</strong><br>未読メールの確認・返信提案・送信代行のために使います</span>
+        </li>
+        <li>
+          <span class="ck"><svg viewBox="0 0 10 10"><polyline points="2,5 4,7.5 8,2.5"/></svg></span>
+          <span><strong style="font-weight:500;color:var(--ink)">Google Calendarの読み取り・書き込み</strong><br>予定の確認・空き時間計算・新規登録のために使います</span>
+        </li>
+        <li>
+          <span class="ck"><svg viewBox="0 0 10 10"><polyline points="2,5 4,7.5 8,2.5"/></svg></span>
+          <span><strong style="font-weight:500;color:var(--ink)">Google連携なしでは機能しません</strong><br>メール・カレンダーへのアクセスがなければ秘書として動けないため、連携は必須です</span>
+        </li>
+      </ul>
+    </div>
+    <div>
+      <div class="sh">
+        <i class="sh-ic">🛡️</i>
+        <div class="sh-tx">
+          <strong>プライバシーポリシー</strong>
+          取得した情報は、AI秘書の機能提供のみに使用します。第三者への提供・広告目的での利用は一切行いません。
+        </div>
+      </div>
+      <div class="sh">
+        <i class="sh-ic">❌</i>
+        <div class="sh-tx">
+          <strong>アクセスしないもの</strong>
+          Drive・連絡先・その他Googleサービスには一切アクセスしません。いつでも連携解除できます。
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+<div class="divider"></div>
+
+<!-- HOW -->
+<section class="surf">
+  <p class="sl">はじめ方</p>
+  <h2 class="st">3分ではじめられます。</h2>
+  <div class="steps">
+    <div class="step">
+      <div class="sn">1</div>
+      <h3 class="stit">LINEで友達追加</h3>
+      <p class="sdesc">QRコードを読み取るか、ボタンをタップするだけ。アプリのインストールは不要です。</p>
+    </div>
+    <div class="step">
+      <div class="sn">2</div>
+      <h3 class="stit">Googleアカウントを連携</h3>
+      <p class="sdesc">LINEに届く連携リンクをタップして、Googleアカウントでログイン。パスワードは不要です。</p>
+      <span class="snote">1〜2分で完了</span>
+    </div>
+    <div class="step">
+      <div class="sn">3</div>
+      <h3 class="stit">体験スタート</h3>
+      <p class="sdesc">連携後すぐに使えます。翌朝8時から毎日ブリーフィングが届きます。</p>
+      <span class="snote">7日間 全機能無料</span>
+    </div>
+  </div>
+</section>
+
+<!-- EXAMPLES -->
+<section>
+  <p class="sl">こんな使い方ができます</p>
+  <h2 class="st">話しかければ、動いてくれる。</h2>
+  <div class="ex-g">
+    <div class="ex"><div class="eq">今日の会食、場所どこだっけ？</div><div class="ea">17:00「取引先との夕食」<br>@銀座 鮨さいとう、1丁目3-14 です。</div><span class="etag">カレンダー検索</span></div>
+    <div class="ex"><div class="eq">重要なメールだけ教えて</div><div class="ea">🔴 急ぎ2件<br>①山田部長「企画書の承認お願いします」<br>②鈴木様「明日の件、確認をお願いします」</div><span class="etag">メール分類</span></div>
+    <div class="ex"><div class="eq">来週火曜午後に田中さんとMTG入れて</div><div class="ea">火曜 13:00〜14:00 空きあり✅<br>「田中さんとのMTG」を登録してよいですか？</div><span class="etag epro">Pro：自然言語で登録</span></div>
+    <div class="ex"><div class="eq">今週の空き時間教えて</div><div class="ea">📅 今週の空き（9〜19時）<br>火 13:00〜17:00<br>水 終日<br>金 10:00〜12:00</div><span class="etag">空き時間計算</span></div>
+    <div class="ex"><div class="eq">鈴木様にリマインドメールを送って</div><div class="ea">件名「明日の打ち合わせのご確認」で送信してよいですか？本文を確認してください。</div><span class="etag epro">Pro：メール送信代行</span></div>
+    <div class="ex"><div class="eq">保留してたメールを確認したい</div><div class="ea">保留中のメール3件<br>①田中様への返信<br>②請求書の確認<br>③採用候補者への連絡</div><span class="etag">保留メール管理</span></div>
+  </div>
+</section>
+<div class="divider"></div>
+
+<!-- PLANS -->
+<section class="dark">
+  <p class="sl">料金プラン</p>
+  <h2 class="st">まず7日間、<br>全機能を無料で。</h2>
+  <div class="pg">
+    <div class="pc">
+      <h3 class="pn">ライトプラン</h3>
+      <div class="pp">480<span>円/月</span></div>
+      <p class="pt">7日間の無料体験後</p>
+      <ul class="pl">
+        <li>毎朝のブリーフィング（予定・メール要約）</li>
+        <li>メール自動分類・重要メール通知</li>
+        <li>定型コマンド（今日の予定・未読メール・タスク一覧 等）</li>
+        <li>タスク管理・期日リマインド</li>
+        <li>保留メール管理</li>
+      </ul>
+    </div>
+    <div class="pc pf">
+      <span class="pb">おすすめ</span>
+      <h3 class="pn">プロプラン</h3>
+      <div class="pp">980<span>円/月</span></div>
+      <p class="pt">7日間の無料体験後</p>
+      <ul class="pl">
+        <li>ライトの全機能</li>
+        <li>AIとの自由な対話（複合リクエスト対応）</li>
+        <li>自然言語でのカレンダー登録・空き時間提案</li>
+        <li>メール送信代行・返信案の自動生成</li>
+        <li>文脈を理解した連続した会話</li>
+        <li>「○○さんに返信して」などの直接指示</li>
+      </ul>
+    </div>
+  </div>
+  <p style="margin-top:32px;font-size:13px;color:rgba(246,243,238,.35);font-weight:300">※ α版のため、決済機能は現在未実装です。体験期間終了後も引き続きご利用いただけます。正式リリース時にご案内します。</p>
+</section>
+
+<!-- START -->
+<section class="qr-sec" id="start">
+  <div class="qr-inner">
+    <p class="sl" style="text-align:center">はじめる</p>
+    <h2 class="st">7日間、無料で試してみてください。</h2>
+    <p>現在α版（先行体験版）としてご提供中です。<br>フィードバックをいただきながらサービスを改善しています。<br>気に入らなければいつでもブロックできます。</p>
+    <div class="qr-layout">
+      <div class="qr-box">
+        <div class="qr-ph">
+          
+          <svg width="72" height="72" viewBox="0 0 80 80" fill="none"><rect x="5" y="5" width="28" height="28" rx="3" stroke="#2A5C3F" stroke-width="3" fill="none"/><rect x="13" y="13" width="12" height="12" rx="1" fill="#2A5C3F"/><rect x="47" y="5" width="28" height="28" rx="3" stroke="#2A5C3F" stroke-width="3" fill="none"/><rect x="55" y="13" width="12" height="12" rx="1" fill="#2A5C3F"/><rect x="5" y="47" width="28" height="28" rx="3" stroke="#2A5C3F" stroke-width="3" fill="none"/><rect x="13" y="55" width="12" height="12" rx="1" fill="#2A5C3F"/><rect x="47" y="47" width="8" height="8" rx="1" fill="#2A5C3F"/><rect x="59" y="47" width="8" height="8" rx="1" fill="#2A5C3F"/><rect x="47" y="59" width="8" height="8" rx="1" fill="#2A5C3F"/><rect x="59" y="59" width="8" height="8" rx="1" fill="#2A5C3F"/></svg>
+          <img src="https://qr-official.line.me/sid/L/210nulgd.png" alt="AI秘書 LINE QRコード" style="width:160px;height:160px;border-radius:8px;">
+        </div>
+        <span class="qr-lb">カメラで読み取る</span>
+      </div>
+      <span class="or">または</span>
+      <a href="https://line.me/R/ti/p/@210nulgd" class="btn-line" style="font-size:16px;padding:18px 36px">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63h2.386c.346 0 .627.285.627.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.105.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63.346 0 .628.285.628.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.281.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314"/></svg>
+        友達追加はこちら
+      </a>
+    </div>
+  </div>
+</section>
+
+<footer>© 2026 AI秘書 &nbsp;|&nbsp; プライバシーポリシー &nbsp;|&nbsp; お問い合わせ</footer>
+
+</body>
+</html>

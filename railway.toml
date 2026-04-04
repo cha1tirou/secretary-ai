@@ -10,4 +10,7 @@ restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
 
 [nixpacks]
-aptPkgs = ["python3"]
+aptPkgs = ["python3", "python3-dev", "build-essential"]
+
+[nixpacks.variables]
+NIXPACKS_NODE_VERSION = "20"

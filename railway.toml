@@ -8,3 +8,6 @@ healthcheckPath = "/health"
 healthcheckTimeout = 10
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
+
+[nixpacks]
+aptPkgs = ["python3"]

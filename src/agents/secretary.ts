@@ -615,7 +615,7 @@ async function proAgentLoop(userId: string, userText: string): Promise<string> {
 
   for (let turn = 0; turn < MAX_TURNS; turn++) {
     const response = await client.messages.create({
-      model: "claude-sonnet-4-5-20250514",
+      model: "claude-sonnet-4-6",
       max_tokens: 1024,
       system: buildSystemPrompt(),
       tools: TOOLS,

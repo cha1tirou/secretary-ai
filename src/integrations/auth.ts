@@ -156,6 +156,11 @@ auth.get("/auth/start", (c) => {
       <div class="step"><span class="step-num">2</span><span>${step2}</span></div>
       <div class="step"><span class="step-num">3</span><span>${step3}</span></div>
       <div class="step"><span class="step-num">4</span><span>${step4}</span></div>
+      <div style="margin-top:16px; background:#fff8e1; border:1px solid #ffe082; border-radius:8px; padding:12px; font-size:13px; color:#555; line-height:1.6;">
+        \u26a0\ufe0f <strong>\u300c\u3053\u306e\u30a2\u30d7\u30ea\u306fGoogle\u3067\u78ba\u8a8d\u3055\u308c\u3066\u3044\u307e\u305b\u3093\u300d</strong>\u3068\u8868\u793a\u3055\u308c\u305f\u5834\u5408<br>
+        \u73fe\u5728\u30c6\u30b9\u30c8\u4e2d\u306e\u305f\u3081\u8b66\u544a\u304c\u51fa\u307e\u3059\u304c\u3001\u5b89\u5168\u3067\u3059\u3002<br>
+        \u753b\u9762\u5de6\u4e0b\u306e\u300c<strong>\u7d9a\u884c</strong>\u300d\u3092\u30bf\u30c3\u30d7\u3057\u3066\u304f\u3060\u3055\u3044\u3002
+      </div>
     </div>
     <button class="btn" id="copyBtn" onclick="copyUrl()">${btnLabel}</button>
     <div class="url-box" id="urlText">${escapedUrl}</div>
@@ -230,9 +235,27 @@ auth.get("/auth/callback", async (c) => {
     const { updateUserTokens } = await import("../db/queries.js");
     updateUserTokens(userId, { gmailToken: tokenJson, gcalToken: tokenJson });
 
+    // LINE に認証完了通知を送る
+    try {
+      const { messagingApi } = await import("@line/bot-sdk");
+      const lineClient = new messagingApi.MessagingApiClient({
+        channelAccessToken: process.env["LINE_CHANNEL_ACCESS_TOKEN"] ?? "",
+      });
+      const accountInfo = email ? `\uFF08${email}\uFF09` : "";
+      await lineClient.pushMessage({
+        to: userId,
+        messages: [{
+          type: "text",
+          text: `\u2705 Google\u30A2\u30AB\u30A6\u30F3\u30C8\u306E\u9023\u643A\u304C\u5B8C\u4E86\u3057\u307E\u3057\u305F${accountInfo}\n\n\u3053\u308C\u3067\u6E96\u5099\u5B8C\u4E86\u3067\u3059\uFF01\u8A66\u3057\u306B\u8A71\u3057\u304B\u3051\u3066\u307F\u3066\u304F\u3060\u3055\u3044\u3002\n\u4F8B\uFF1A\u300C\u4ECA\u65E5\u306E\u4E88\u5B9A\u306F\uFF1F\u300D\u300C\u672A\u8AAD\u30E1\u30FC\u30EB\u3042\u308B\uFF1F\u300D`,
+        }],
+      });
+    } catch (lineErr) {
+      console.warn("[auth] LINE\u901A\u77E5\u5931\u6557\uFF08\u7D9A\u884C\uFF09:", lineErr);
+    }
+
     return c.html(`
-      <h1>認証成功</h1>
-      <p>Google連携が完了しました（ラベル: ${label}${email ? `、${email}` : ""}）。<br>このページを閉じてLINEに戻ってください。</p>
+      <h1>\u8A8D\u8A3C\u6210\u529F</h1>
+      <p>Google\u9023\u643A\u304C\u5B8C\u4E86\u3057\u307E\u3057\u305F\u3002<br>\u3053\u306E\u30DA\u30FC\u30B8\u3092\u9589\u3058\u3066LINE\u306B\u623B\u3063\u3066\u304F\u3060\u3055\u3044\u3002</p>
     `);
   } catch (err) {
     console.error("OAuth callback error:", err);

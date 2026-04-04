@@ -401,7 +401,9 @@ webhook.post("/webhook", async (c) => {
         const userId = event.source.userId;
         if (!userId) return;
         upsertUser(userId, undefined, "trial");
-        const baseUrl = getBaseUrl();
+        const baseUrl = (process.env["GOOGLE_REDIRECT_URI"] ?? "")
+          .replace("/auth/callback", "")
+          || "https://web-production-b2798.up.railway.app";
         const authUrl = `${baseUrl}/auth/start?user=${userId}&label=${encodeURIComponent("アカウント1")}`;
         const messages = buildWelcomeMessages(userId, authUrl);
         // LINE push は1回5通まで。4通なのでまとめて送信

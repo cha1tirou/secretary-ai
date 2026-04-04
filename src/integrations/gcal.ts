@@ -1,8 +1,17 @@
 import { google } from "googleapis";
-import { getAuthedClient } from "./auth.js";
+import { getAuthedClient, ReauthRequiredError } from "./auth.js";
+import { GoogleApiError } from "./errors.js";
 import { getGoogleAccountsByUserId } from "../db/queries.js";
 import type { CalendarEvent } from "../types.js";
 import type { GoogleAccount } from "../types.js";
+
+function wrapGoogleError(err: unknown, userId: string): never {
+  if (err instanceof ReauthRequiredError) throw err;
+  if (err instanceof GoogleApiError) throw err;
+  const msg = err instanceof Error ? err.message : String(err);
+  const status = (err as any)?.code ?? (err as any)?.status ?? 0;
+  throw new GoogleApiError(userId, msg, Number(status));
+}
 
 async function getCalendarClient(userId: string, account?: GoogleAccount) {
   const auth = await getAuthedClient(userId, "gcalToken", account);
@@ -82,7 +91,7 @@ export async function getTodayEvents(userId: string): Promise<CalendarEvent[]> {
     return events;
   } catch (err) {
     console.error("[gcal] getTodayEvents エラー:", err);
-    throw err;
+    wrapGoogleError(err, userId);
   }
 }
 
@@ -108,56 +117,63 @@ async function getWeekEventsForAccount(
 }
 
 export async function getWeekEvents(userId: string): Promise<CalendarEvent[]> {
-  const accounts = getGoogleAccountsByUserId(userId);
+  try {
+    const accounts = getGoogleAccountsByUserId(userId);
 
-  if (accounts.length === 0) {
-    return getWeekEventsForAccount(userId);
-  }
+    if (accounts.length === 0) {
+      return await getWeekEventsForAccount(userId);
+    }
 
-  const results = await Promise.allSettled(
-    accounts.map((acc) => getWeekEventsForAccount(userId, acc)),
-  );
+    const results = await Promise.allSettled(
+      accounts.map((acc) => getWeekEventsForAccount(userId, acc)),
+    );
 
-  const events: CalendarEvent[] = [];
-  const seenIds = new Set<string>();
-  for (const result of results) {
-    if (result.status === "fulfilled") {
-      for (const event of result.value) {
-        if (!seenIds.has(event.id)) {
-          seenIds.add(event.id);
-          events.push(event);
+    const events: CalendarEvent[] = [];
+    const seenIds = new Set<string>();
+    for (const result of results) {
+      if (result.status === "fulfilled") {
+        for (const event of result.value) {
+          if (!seenIds.has(event.id)) {
+            seenIds.add(event.id);
+            events.push(event);
+          }
         }
       }
     }
-  }
 
-  events.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
-  return events;
+    events.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+    return events;
+  } catch (err) {
+    wrapGoogleError(err, userId);
+  }
 }
 
 export async function createEvent(
   userId: string,
   params: { title: string; start: string; end: string; location?: string; description?: string },
 ): Promise<CalendarEvent> {
-  // 最初のアカウントに予定を作成
-  const accounts = getGoogleAccountsByUserId(userId);
-  const account = accounts.length > 0 ? accounts[0] : undefined;
-  const calendar = await getCalendarClient(userId, account);
+  try {
+    const accounts = getGoogleAccountsByUserId(userId);
+    const account = accounts.length > 0 ? accounts[0] : undefined;
+    const calendar = await getCalendarClient(userId, account);
 
-  const requestBody: Record<string, unknown> = {
-    summary: params.title,
-    start: { dateTime: params.start, timeZone: "Asia/Tokyo" },
-    end: { dateTime: params.end, timeZone: "Asia/Tokyo" },
-  };
-  if (params.location) requestBody["location"] = params.location;
-  if (params.description) requestBody["description"] = params.description;
+    const requestBody: Record<string, unknown> = {
+      summary: params.title,
+      start: { dateTime: params.start, timeZone: "Asia/Tokyo" },
+      end: { dateTime: params.end, timeZone: "Asia/Tokyo" },
+    };
+    if (params.location) requestBody["location"] = params.location;
+    if (params.description) requestBody["description"] = params.description;
 
-  const res = await calendar.events.insert({
-    calendarId: "primary",
-    requestBody,
-  });
+    const res = await calendar.events.insert({
+      calendarId: "primary",
+      requestBody,
+    });
 
-  return toCalendarEvent(res.data);
+    return toCalendarEvent(res.data);
+  } catch (err) {
+    wrapGoogleError(err, userId);
+  }
 }
 
 // ── 直接実行で動作確認 ──

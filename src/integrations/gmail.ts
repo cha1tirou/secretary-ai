@@ -1,8 +1,17 @@
 import { google } from "googleapis";
-import { getAuthedClient } from "./auth.js";
+import { getAuthedClient, ReauthRequiredError } from "./auth.js";
+import { GoogleApiError } from "./errors.js";
 import { getGoogleAccountsByUserId } from "../db/queries.js";
 import type { Email } from "../types.js";
 import type { GoogleAccount } from "../types.js";
+
+function wrapGoogleError(err: unknown, userId: string): never {
+  if (err instanceof ReauthRequiredError) throw err;
+  if (err instanceof GoogleApiError) throw err;
+  const msg = err instanceof Error ? err.message : String(err);
+  const status = (err as any)?.code ?? (err as any)?.status ?? 0;
+  throw new GoogleApiError(userId, msg, Number(status));
+}
 
 async function getGmailClient(userId: string, account?: GoogleAccount) {
   const auth = await getAuthedClient(userId, "gmailToken", account);
@@ -96,34 +105,43 @@ async function getUnreadEmailsForAccount(
 }
 
 export async function getUnreadEmails(userId: string): Promise<Email[]> {
-  const accounts = getGoogleAccountsByUserId(userId);
+  try {
+    const accounts = getGoogleAccountsByUserId(userId);
 
-  if (accounts.length === 0) {
-    // フォールバック: users テーブルのトークンを使用
-    return getUnreadEmailsForAccount(userId);
-  }
-
-  // 全アカウントから並行取得してマージ
-  const results = await Promise.allSettled(
-    accounts.map((acc) => getUnreadEmailsForAccount(userId, acc)),
-  );
-
-  const emails: Email[] = [];
-  const seenIds = new Set<string>();
-  for (const result of results) {
-    if (result.status === "fulfilled") {
-      for (const email of result.value) {
-        if (!seenIds.has(email.id)) {
-          seenIds.add(email.id);
-          emails.push(email);
-        }
-      }
-    } else {
-      console.error("[gmail] アカウント取得エラー:", result.reason);
+    if (accounts.length === 0) {
+      return await getUnreadEmailsForAccount(userId);
     }
-  }
 
-  return emails;
+    const results = await Promise.allSettled(
+      accounts.map((acc) => getUnreadEmailsForAccount(userId, acc)),
+    );
+
+    const emails: Email[] = [];
+    const seenIds = new Set<string>();
+    let lastError: unknown = null;
+    for (const result of results) {
+      if (result.status === "fulfilled") {
+        for (const email of result.value) {
+          if (!seenIds.has(email.id)) {
+            seenIds.add(email.id);
+            emails.push(email);
+          }
+        }
+      } else {
+        lastError = result.reason;
+        console.error("[gmail] アカウント取得エラー:", result.reason);
+      }
+    }
+
+    // 全アカウント失敗の場合はエラーを伝播
+    if (emails.length === 0 && lastError) {
+      wrapGoogleError(lastError, userId);
+    }
+
+    return emails;
+  } catch (err) {
+    wrapGoogleError(err, userId);
+  }
 }
 
 async function getSentEmailsForAccount(
@@ -177,49 +195,55 @@ export async function getSentEmails(
   userId: string,
   maxResults = 10,
 ): Promise<Email[]> {
-  const accounts = getGoogleAccountsByUserId(userId);
+  try {
+    const accounts = getGoogleAccountsByUserId(userId);
 
-  if (accounts.length === 0) {
-    return getSentEmailsForAccount(userId, maxResults);
-  }
+    if (accounts.length === 0) {
+      return await getSentEmailsForAccount(userId, maxResults);
+    }
 
-  const results = await Promise.allSettled(
-    accounts.map((acc) => getSentEmailsForAccount(userId, maxResults, acc)),
-  );
+    const results = await Promise.allSettled(
+      accounts.map((acc) => getSentEmailsForAccount(userId, maxResults, acc)),
+    );
 
-  const emails: Email[] = [];
-  const seenIds = new Set<string>();
-  for (const result of results) {
-    if (result.status === "fulfilled") {
-      for (const email of result.value) {
-        if (!seenIds.has(email.id)) {
-          seenIds.add(email.id);
-          emails.push(email);
+    const emails: Email[] = [];
+    const seenIds = new Set<string>();
+    for (const result of results) {
+      if (result.status === "fulfilled") {
+        for (const email of result.value) {
+          if (!seenIds.has(email.id)) {
+            seenIds.add(email.id);
+            emails.push(email);
+          }
         }
       }
     }
-  }
 
-  return emails;
+    return emails;
+  } catch (err) {
+    wrapGoogleError(err, userId);
+  }
 }
 
 export async function getThread(
   threadId: string,
   userId: string,
 ): Promise<Email[]> {
-  const accounts = getGoogleAccountsByUserId(userId);
+  try {
+    const accounts = getGoogleAccountsByUserId(userId);
 
-  // 各アカウントでスレッド取得を試みる（スレッドは1アカウントにしか存在しない）
-  for (const account of accounts) {
-    try {
-      return await getThreadForAccount(threadId, userId, account);
-    } catch {
-      // このアカウントにはスレッドがない、次へ
+    for (const account of accounts) {
+      try {
+        return await getThreadForAccount(threadId, userId, account);
+      } catch {
+        // このアカウントにはスレッドがない、次へ
+      }
     }
-  }
 
-  // フォールバック: users テーブルのトークン
-  return getThreadForAccount(threadId, userId);
+    return await getThreadForAccount(threadId, userId);
+  } catch (err) {
+    wrapGoogleError(err, userId);
+  }
 }
 
 async function getThreadForAccount(
@@ -265,23 +289,24 @@ export async function sendReply(
   subject: string,
   body: string,
 ): Promise<string> {
-  const accounts = getGoogleAccountsByUserId(userId);
+  try {
+    const accounts = getGoogleAccountsByUserId(userId);
 
-  // スレッドが存在するアカウントから送信を試みる
-  for (const account of accounts) {
-    try {
-      const gmail = await getGmailClient(userId, account);
-      // スレッドの存在確認
-      await gmail.users.threads.get({ userId: "me", id: threadId, format: "minimal" });
-      return await sendReplyWithClient(gmail, threadId, to, subject, body);
-    } catch {
-      // このアカウントにはスレッドがない、次へ
+    for (const account of accounts) {
+      try {
+        const gmail = await getGmailClient(userId, account);
+        await gmail.users.threads.get({ userId: "me", id: threadId, format: "minimal" });
+        return await sendReplyWithClient(gmail, threadId, to, subject, body);
+      } catch {
+        // このアカウントにはスレッドがない、次へ
+      }
     }
-  }
 
-  // フォールバック: デフォルトアカウント
-  const gmail = await getGmailClient(userId);
-  return sendReplyWithClient(gmail, threadId, to, subject, body);
+    const gmail = await getGmailClient(userId);
+    return await sendReplyWithClient(gmail, threadId, to, subject, body);
+  } catch (err) {
+    wrapGoogleError(err, userId);
+  }
 }
 
 async function sendReplyWithClient(

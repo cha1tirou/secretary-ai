@@ -16,10 +16,46 @@ import {
   getGoogleAccountsByUserId,
 } from "../db/queries.js";
 import { ReauthRequiredError, buildAuthUrl } from "../integrations/auth.js";
+import { GoogleApiError } from "../integrations/errors.js";
 import type { Plan } from "../types.js";
 import type { CalendarEvent } from "../types.js";
 
 const isDev = process.env["NODE_ENV"] === "development";
+
+function googleReauthMessage(userId: string): string {
+  return `Google連携の認証が切れました。再連携が必要です。\n👇 こちらからどうぞ\n${buildAuthUrl(userId)}`;
+}
+
+function classifyError(err: unknown, userId: string): string {
+  const msg = err instanceof Error ? err.message : String(err);
+
+  // Google API 再認証系
+  if (err instanceof ReauthRequiredError) {
+    return googleReauthMessage(userId);
+  }
+  if (err instanceof GoogleApiError) {
+    if (/invalid_grant|Token has been expired|Token has been revoked/i.test(msg)) {
+      return googleReauthMessage(userId);
+    }
+    if (/insufficient_permission|forbidden/i.test(msg) || err.status === 403) {
+      return `Gmailへのアクセス権限がありません。再連携で権限を許可してください。\n👇 ${buildAuthUrl(userId)}`;
+    }
+    return "データの取得中にエラーが発生しました。しばらくしてから再度お試しください。";
+  }
+
+  // Anthropic API 系
+  if (/credit balance/i.test(msg)) {
+    return "システムエラーが発生しました。しばらくしてから再度お試しください。";
+  }
+  if (/rate_limit/i.test(msg) || (err instanceof Anthropic.APIError && err.status === 429)) {
+    return "ただいま処理が混み合っています。1分ほど待ってからお試しください。";
+  }
+  if (/not_found_error/i.test(msg)) {
+    return "システムエラーが発生しました。しばらくしてから再度お試しください。";
+  }
+
+  return "エラーが発生しました。しばらくしてから再度お試しください。";
+}
 
 // ── コスト最適化 ──
 // simple_command: Sonnet不使用、コード処理のみ（約0.04円/回）
@@ -448,13 +484,18 @@ const EXPIRED_MESSAGE = `7日間の無料体験が終了しました。
 
 ※決済機能は近日公開予定です。それまでの間は引き続き全機能をお使いいただけます。`;
 
-const LIGHT_UPGRADE_MESSAGE = `この機能はプロプランでご利用いただけます。
+const LIGHT_UPGRADE_MESSAGE = `このコマンドはプロプランでご利用いただけます。
 
-プロプランでは、AIとの自由な対話や複合的なリクエストにも対応できます。
+使えるコマンド：
+・今日の予定
+・今週の予定
+・未読メール
+・急ぎメール
+・タスク一覧
+・タスク追加
+・保留メール一覧
 
-ライト: 480円/月（現在のプラン）
-プロ: 980円/月
-
+プロプラン（980円/月）ではAIとの自由な対話にも対応できます。
 ※決済機能は近日公開予定です。`;
 
 // ── Light Plan Processor ──
@@ -592,10 +633,8 @@ export async function handleWithSecretary(
       result = await proAgentLoop(userId, userText);
     }
   } catch (err) {
-    if (err instanceof ReauthRequiredError) {
-      return `Googleアカウントの認証が切れています。\n再連携してください👇\n${err.authUrl}`;
-    }
-    throw err;
+    console.error(`[secretary] handleWithSecretary error (${userId}):`, err);
+    return classifyError(err, userId);
   }
 
   // trial残日数警告を追記
@@ -666,12 +705,20 @@ async function proAgentLoop(userId: string, userText: string): Promise<string> {
               content: result,
             });
           } catch (err) {
-            const errMsg = err instanceof Error ? err.message : String(err);
             console.error(`[secretary] tool error (${toolUse.name}):`, err);
+            // 再認証が必要なエラーは即座にユーザーに返す
+            if (err instanceof ReauthRequiredError || err instanceof GoogleApiError) {
+              const reply = classifyError(err, userId);
+              addConversation(userId, "assistant", reply);
+              return reply;
+            }
+            const friendlyMsg = toolUse.name === "create_calendar_event"
+              ? "予定の登録に失敗しました。日時や内容を確認してもう一度お試しください。"
+              : "データの取得中にエラーが発生しました。";
             toolResults.push({
               type: "tool_result",
               tool_use_id: toolUse.id,
-              content: `エラー: ${errMsg}`,
+              content: friendlyMsg,
               is_error: true,
             });
           }

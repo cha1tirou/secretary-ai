@@ -269,6 +269,10 @@ function buildWelcomeMessages(userId: string, authUrl: string): any[] {
       "トライアル終了後のご案内は別途お送りします。",
       "",
       "ご意見・不具合はいつでもこのLINEに送ってください！",
+      "",
+      "【αテスト参加方法】",
+      "まずこのLINEにあなたのGmailアドレスを送ってください。",
+      "登録後にGoogle連携用のリンクをお送りします。",
     ].join("\n"),
   };
 

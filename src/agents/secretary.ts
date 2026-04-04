@@ -89,6 +89,8 @@ function matchSimpleCommand(text: string): SimpleCommand | null {
   if (/今週の予定|週間|今週どんな/.test(text)) return { type: "week_schedule" };
   if (/今月の予定|今月のスケジュール|今月は何がある/.test(text)) return { type: "month_schedule" };
   if (/空いてる|空き時間|いつ空いてる/.test(text)) return { type: "free_time" };
+  // 「返信すべき」「要返信」系はSonnetに判断を委譲（simple commandにしない）
+  if (/返信すべき|要返信|返信が必要|返さないと|返信.*メール.*ある|メール.*返信/.test(text)) return null;
   if (/未読|メール来てる|メールチェック/.test(text) && !/重要|急ぎ|至急|大事|優先/.test(text)) return { type: "unread_email" };
 
   const taskAddMatch = text.match(/(.+?)をタスクに/) || ((/タスクに追加/.test(text)) ? [null, text.replace(/タスクに追加|して|を/g, "").trim()] : null);
@@ -315,16 +317,15 @@ const TOOLS: Tool[] = [
     },
   },
   {
-    name: "search_emails",
-    description: "未読メールを検索する（差出人、件名、キーワードで絞り込み）",
+    name: "get_emails",
+    description: "メールを取得する。未読のみまたは最近の全メール（既読含む）を取得できる。返信が必要かどうかはあなたが本文・件名・差出人を見て判断する。",
     input_schema: {
       type: "object" as const,
       properties: {
-        from: { type: "string", description: "差出人フィルタ" },
-        subject: { type: "string", description: "件名フィルタ" },
-        keyword: { type: "string", description: "本文キーワード" },
+        scope: { type: "string", enum: ["unread", "all"], description: "unread: 未読のみ / all: 既読含む最近50件" },
+        max_results: { type: "number", description: "取得件数（デフォルト20）" },
       },
-      required: [],
+      required: ["scope"],
     },
   },
   {
@@ -402,18 +403,13 @@ function mockToolResult(name: string, input: Record<string, unknown>): string | 
       return "4/4(金): 09:00〜10:00, 11:00〜14:00, 15:30〜17:00\n4/7(月): 09:00〜13:00, 14:00〜19:00\n4/8(火): 終日空き\n4/9(水): 09:00〜10:00, 11:30〜19:00\n4/10(木): 終日空き";
     case "create_calendar_event":
       return `予定を登録しました: ${input.title} (${input.start}〜${input.end})`;
-    case "search_emails": {
-      const fromQ = ((input.from as string) ?? "").toLowerCase();
-      if (fromQ.includes("山田")) {
-        return JSON.stringify([
-          { from: "山田太郎 <yamada@example.com>", subject: "来週の企画書について", date: "2026-04-03 18:30", body: "お疲れ様です。来週の企画書の件ですが、金曜までにレビューをお願いできますか？" },
-          { from: "山田太郎 <yamada@example.com>", subject: "Re: 予算確認", date: "2026-04-02 11:15", body: "確認しました。問題ありません。進めてください。" },
-        ]);
-      }
+    case "get_emails":
       return JSON.stringify([
-        { from: "佐藤花子 <sato@example.com>", subject: "月次レポート提出依頼", date: "2026-04-03 09:00", body: "月次レポートを4/10までにご提出ください。" },
+        { id: "m1", from: "山田太郎 <yamada@example.com>", subject: "来週の企画書について", date: "2026-04-03 18:30", body: "お疲れ様です。来週の企画書の件ですが、金曜までにレビューをお願いできますか？", isUnread: true },
+        { id: "m2", from: "佐藤花子 <sato@example.com>", subject: "月次レポート提出依頼", date: "2026-04-03 09:00", body: "月次レポートを4/10までにご提出ください。", isUnread: true },
+        { id: "m3", from: "no-reply@example.com", subject: "ご注文の確認", date: "2026-04-02 22:00", body: "ご注文ありがとうございます。注文番号: 12345", isUnread: true },
+        { id: "m4", from: "鈴木一郎 <suzuki@example.com>", subject: "日程調整のお願い", date: "2026-04-02 15:00", body: "来週のミーティングですが、ご都合いかがでしょうか？", isUnread: true },
       ]);
-    }
     default:
       return null; // DB操作系（tasks, hold_emails）はdevでも実データを使う
   }
@@ -455,19 +451,18 @@ async function executeTool(name: string, input: Record<string, unknown>, userId:
       const created = await createEvent(userId, params);
       return `予定を登録しました: ${created.summary} (${created.start}〜${created.end})`;
     }
-    case "search_emails": {
+    case "get_emails": {
+      const scope = input.scope as string;
+      const max = (input.max_results as number) ?? 20;
+      // TODO: scope === "all" 時は既読含む全件取得（getAllEmails）を後で実装
       const emails = await getUnreadEmails(userId);
-      const fromQ = ((input.from as string) ?? "").toLowerCase();
-      const subjectQ = ((input.subject as string) ?? "").toLowerCase();
-      const keywordQ = ((input.keyword as string) ?? "").toLowerCase();
-      const matched = emails.filter((e) => {
-        if (fromQ && !e.from.toLowerCase().includes(fromQ)) return false;
-        if (subjectQ && !e.subject.toLowerCase().includes(subjectQ)) return false;
-        if (keywordQ && !e.body.toLowerCase().includes(keywordQ) && !e.subject.toLowerCase().includes(keywordQ)) return false;
-        return true;
-      });
-      return JSON.stringify(matched.slice(0, 5).map((e) => ({
-        from: e.from, subject: e.subject, date: e.date, body: e.body.slice(0, 100),
+      return JSON.stringify(emails.slice(0, max).map((e) => ({
+        id: e.id,
+        from: e.from,
+        subject: e.subject,
+        date: e.date,
+        body: e.body.slice(0, 200),
+        isUnread: e.isUnread,
       })));
     }
     case "get_tasks": {
@@ -507,7 +502,14 @@ function buildSystemPrompt(): string {
 - 日本語で簡潔に回答する
 - メール送信・カレンダー登録前は必ずユーザーに確認を取る
 - 返答は200文字以内
-- 日時は〇月〇日（曜日）HH:MM形式で表記する`;
+- 日時は〇月〇日（曜日）HH:MM形式で表記する
+
+メール判断ルール：
+- メールの返信要否はget_emailsで取得してから、本文・件名・差出人を見てあなたが判断する
+- 「返信すべきメール」「要返信メール」と聞かれたら、まず「未読のみですか？それとも既読も含めて確認しますか？」と確認してからget_emailsを呼ぶ
+- get_emailsで取得したメールのうち、返信が必要と判断したもの（質問・依頼・日程調整・確認依頼など）だけを返す
+- 返信不要なもの（お知らせ・領収書・自動送信・no-reply）は除外する
+- 今月の予定を聞かれたらget_month_eventsツールを使う`;
 }
 
 // ── Plan Messages ──
@@ -577,13 +579,16 @@ async function lightPlanProcessor(userId: string, message: string): Promise<stri
     }
     return text;
   }
-  if (/急ぎ|重要.*メール|要返信/.test(message)) {
+  if (/急ぎ|重要.*メール|要返信|返信すべき|返信が必要/.test(message)) {
     const emails = await getUnreadEmails(userId);
-    // 簡易: 件名に急ぎ・至急を含むものだけ
-    const urgent = emails.filter((e) => /急ぎ|至急|urgent/i.test(e.subject + e.body));
-    if (urgent.length === 0) return "急ぎのメールはありません。";
-    let text = `要対応メール（${urgent.length}件）`;
-    for (const e of urgent.slice(0, 5)) {
+    // 簡易判断（LLM不使用）: 件名に急ぎ・返信要のパターンを含むもの
+    const needReply = emails.filter((e) => {
+      const text = e.subject + e.body;
+      return /急ぎ|至急|urgent|日程|確認|教えて|ご回答|いかがでしょう|お返事/i.test(text);
+    });
+    if (needReply.length === 0) return "要返信のメールはありません。";
+    let text = `要返信メール（${needReply.length}件）`;
+    for (const e of needReply.slice(0, 5)) {
       const from = (e.from.split("<")[0] ?? "").trim() || e.from;
       text += `\n\n・${from}\n　${e.subject}`;
     }

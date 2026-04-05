@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { Tool, MessageParam, ContentBlockParam, ToolResultBlockParam, ToolUseBlock } from "@anthropic-ai/sdk/resources/messages.js";
 import { getTodayEvents, getWeekEvents, getMonthEvents, createEvent } from "../integrations/gcal.js";
-import { getUnreadEmails, getThread, sendReply } from "../integrations/gmail.js";
+import { getUnreadEmails, getAllEmails, getThread, sendReply } from "../integrations/gmail.js";
 import {
   getUser,
   getTasks,
@@ -442,8 +442,9 @@ async function executeTool(name: string, input: Record<string, unknown>, userId:
     case "get_emails": {
       const scope = input.scope as string;
       const max = (input.max_results as number) ?? 20;
-      // TODO: scope === "all" 時は既読含む全件取得（getAllEmails）を後で実装
-      const emails = await getUnreadEmails(userId);
+      const emails = scope === "all"
+        ? await getAllEmails(userId, max)
+        : await getUnreadEmails(userId);
       return JSON.stringify(emails.slice(0, max).map((e) => ({
         id: e.id,
         from: e.from,
@@ -570,7 +571,7 @@ async function lightPlanProcessor(userId: string, message: string): Promise<stri
     return text;
   }
   if (/急ぎ|重要.*メール/.test(message)) {
-    const emails = await getUnreadEmails(userId);
+    const emails = await getAllEmails(userId, 30);
     const needReply = emails.filter((e) => {
       const text = e.subject + e.body;
       return /急ぎ|至急|urgent/i.test(text);

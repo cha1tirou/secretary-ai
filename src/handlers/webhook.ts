@@ -51,9 +51,9 @@ function buildWelcomeMessages(authUrl: string): { batch1: any[]; batch2: any[] }
       body: {
         type: "box", layout: "vertical", paddingAll: "20px", spacing: "lg",
         contents: [
-          featureRow("\uD83D\uDCE1", "Push", "\u5927\u4E8B\u306A\u3053\u3068\u3092\u5148\u56DE\u308A\u3057\u3066\u304A\u77E5\u3089\u305B"),
-          featureRow("\uD83D\uDCEC", "\u30E1\u30FC\u30EB\u51E6\u7406", "\u6E9C\u307E\u3063\u305F\u30E1\u30FC\u30EB\u4F5C\u696D\u3092AI\u304C\u304A\u624B\u4F1D\u3044"),
-          featureRow("\uD83D\uDCAC", "Pull", "\u30E1\u30FC\u30EB\u30FB\u4E88\u5B9A\u3092\u67D4\u8EDF\u306B\u691C\u7D22\u30FB\u767B\u9332"),
+          featureRow("\uD83D\uDD14", "\u81EA\u52D5\u304A\u77E5\u3089\u305B", "\u5927\u4E8B\u306A\u3053\u3068\u3092\u5148\u56DE\u308A\u3057\u3066\u5C4A\u3051\u307E\u3059"),
+          featureRow("\uD83D\uDCEC", "\u30E1\u30FC\u30EB\u6574\u7406", "\u8FD4\u4FE1\u30FB\u50AC\u4FC3\u3092AI\u3068\u4E00\u7DD2\u306B\u7247\u4ED8\u3051\u308B"),
+          featureRow("\uD83D\uDCAC", "\u8A71\u3057\u304B\u3051\u308B\u3060\u3051", "\u30E1\u30FC\u30EB\u691C\u7D22\u304B\u3089\u4E88\u5B9A\u767B\u9332\u307E\u3067\u5373\u5BFE\u5FDC"),
         ],
       },
       footer: {
@@ -95,7 +95,7 @@ function buildWelcomeMessages(authUrl: string): { batch1: any[]; batch2: any[] }
       type: "bubble", size: "giga",
       header: {
         type: "box", layout: "vertical", backgroundColor: "#e67e22", paddingAll: "20px",
-        contents: [{ type: "text", text: "\uD83D\uDCEC \u30E1\u30FC\u30EB\u51E6\u7406 \u2014 \u6E9C\u307E\u3063\u305F\u30E1\u30FC\u30EB\u4F5C\u696D\u3092AI\u304C\u304A\u624B\u4F1D\u3044", color: "#ffffff", weight: "bold", size: "md", wrap: true }],
+        contents: [{ type: "text", text: "\uD83D\uDCEC \u30E1\u30FC\u30EB\u6574\u7406 \u2014 \u8FD4\u4FE1\u30FB\u50AC\u4FC3\u3092AI\u3068\u4E00\u7DD2\u306B\u7247\u4ED8\u3051\u308B", color: "#ffffff", weight: "bold", size: "md", wrap: true }],
       },
       body: {
         type: "box", layout: "vertical", paddingAll: "20px", spacing: "md",
@@ -117,7 +117,7 @@ function buildWelcomeMessages(authUrl: string): { batch1: any[]; batch2: any[] }
       type: "bubble", size: "giga",
       header: {
         type: "box", layout: "vertical", backgroundColor: "#8e44ad", paddingAll: "20px",
-        contents: [{ type: "text", text: "\uD83D\uDCAC Pull \u2014 \u30E1\u30FC\u30EB\u30FB\u4E88\u5B9A\u3092\u67D4\u8EDF\u306B\u691C\u7D22\u30FB\u767B\u9332", color: "#ffffff", weight: "bold", size: "md", wrap: true }],
+        contents: [{ type: "text", text: "\uD83D\uDCAC \u8A71\u3057\u304B\u3051\u308B\u3060\u3051 \u2014 \u691C\u7D22\u30FB\u767B\u9332\u30FB\u78BA\u8A8D\u3092LINE\u3067\u5B8C\u7D50", color: "#ffffff", weight: "bold", size: "md", wrap: true }],
       },
       body: {
         type: "box", layout: "vertical", paddingAll: "20px", spacing: "md",

@@ -499,10 +499,11 @@ async function executeTool(name: string, input: Record<string, unknown>, userId:
 
 // ── System Prompt ──
 
-function buildSystemPrompt(): string {
+function buildSystemPrompt(userId: string): string {
   const today = new Date().toLocaleDateString("ja-JP", {
     weekday: "long", year: "numeric", month: "long", day: "numeric",
   });
+  const dashboardUrl = `https://web-production-b2798.up.railway.app/dashboard?token=${userId}`;
   return `あなたは優秀なAI秘書です。今日: ${today}
 ルール：
 - 日本語で簡潔に回答する
@@ -512,7 +513,8 @@ function buildSystemPrompt(): string {
 
 メール判断ルール：
 - メールの返信要否はget_emailsで取得してから、本文・件名・差出人を見てあなたが判断する
-- 「返信すべきメール」「要返信メール」と聞かれたら、ダッシュボードで確認・処理できることを案内する。「ダッシュボードをご確認ください」と案内するだけでよい
+- 「返信すべきメール」「要返信メール」と聞かれたら、以下のようにダッシュボードURLを案内する：
+  「返信が必要なメールはダッシュボードで確認・処理できます。\n${dashboardUrl}」
 - get_emailsで取得したメールのうち、返信が必要と判断したもの（質問・依頼・日程調整・確認依頼など）だけを返す
 - 返信不要なもの（お知らせ・領収書・自動送信・no-reply）は除外する
 - 今月の予定を聞かれたらget_month_eventsツールを使う`;
@@ -742,7 +744,7 @@ async function proAgentLoop(userId: string, userText: string): Promise<string> {
     const response = await client.messages.create({
       model: "claude-sonnet-4-6",
       max_tokens: 1024,
-      system: buildSystemPrompt(),
+      system: buildSystemPrompt(userId),
       tools: TOOLS,
       messages,
     });

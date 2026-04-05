@@ -3,11 +3,13 @@ import { getUnreadEmails, getSentEmails, checkThreadReplied, getThread, sendRepl
 import { generateReply } from "../agents/reply.js";
 import {
   getGoogleAccountsByUserId,
+  getUser,
   getPendingRepliesByStatus,
   getPendingReply,
   createPendingReply,
   updatePendingReplyStatus,
 } from "../db/queries.js";
+import { buildAuthUrl } from "../integrations/auth.js";
 import type { Email, PendingReply } from "../types.js";
 
 const dashboard = new Hono();
@@ -22,10 +24,24 @@ dashboard.get("/dashboard", async (c) => {
   if (!userId) return c.text("token required", 401);
 
   try {
+    // ユーザー存在チェック
+    const user = getUser(userId);
+    if (!user) return c.text("user not found", 404);
+
+    // Google未連携チェック
+    const accounts = getGoogleAccountsByUserId(userId);
+    if (accounts.length === 0 && !user.gmailToken) {
+      const authUrl = buildAuthUrl(userId);
+      return c.html(`<!DOCTYPE html><html><body style="font-family:sans-serif;text-align:center;padding:40px">
+        <p style="font-size:48px">\uD83D\uDD17</p>
+        <p style="font-size:18px;margin-bottom:16px">Google\u30A2\u30AB\u30A6\u30F3\u30C8\u304C\u672A\u9023\u643A\u3067\u3059</p>
+        <a href="${authUrl}" style="background:#06C755;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold">\u9023\u643A\u3059\u308B</a>
+      </body></html>`);
+    }
+
     const unread = await getUnreadEmails(userId).catch(() => [] as Email[]);
     const sent = await getSentEmails(userId, 20).catch(() => [] as Email[]);
 
-    const accounts = getGoogleAccountsByUserId(userId);
     const myEmails = accounts.map((a) => a.email).filter((e): e is string => e !== null);
 
     const awaitingReply: (Email & { daysAgo: number })[] = [];
@@ -47,8 +63,13 @@ dashboard.get("/dashboard", async (c) => {
     const pending = getPendingRepliesByStatus(userId, "pending");
     return c.html(buildDashboardHtml(userId, unread, awaitingReply, pending));
   } catch (err) {
-    console.error("[dashboard] GET /dashboard error:", err);
-    return c.text("Internal Server Error", 500);
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[dashboard] GET /dashboard error:", msg, err);
+    return c.html(`<!DOCTYPE html><html><body style="font-family:sans-serif;text-align:center;padding:40px">
+      <p style="font-size:48px">\u26A0\uFE0F</p>
+      <p style="font-size:18px;margin-bottom:8px">\u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9\u306E\u8AAD\u307F\u8FBC\u307F\u306B\u5931\u6557\u3057\u307E\u3057\u305F</p>
+      <p style="font-size:14px;color:#888">\u3057\u3070\u3089\u304F\u3057\u3066\u304B\u3089\u518D\u5EA6\u304A\u8A66\u3057\u304F\u3060\u3055\u3044</p>
+    </body></html>`, 500);
   }
 });
 

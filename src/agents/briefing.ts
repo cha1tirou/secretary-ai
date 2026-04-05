@@ -6,7 +6,6 @@ import { getGoogleAccountsByUserId, countProcessedEmailsByCategory, getProcessed
 import type { CalendarEvent, Email } from "../types.js";
 
 const isDev = process.env["NODE_ENV"] === "development";
-const DASHBOARD_URL = "https://web-production-b2798.up.railway.app/dashboard";
 
 // ── Helpers ──
 

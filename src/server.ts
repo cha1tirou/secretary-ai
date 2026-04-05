@@ -8,6 +8,7 @@ import { webhook } from "./handlers/webhook.js";
 import { auth } from "./integrations/auth.js";
 import { startCron } from "./cron/morning.js";
 import { startAutoDraft } from "./cron/auto-draft.js";
+import { dashboard } from "./routes/dashboard.js";
 
 const app = new Hono();
 
@@ -36,6 +37,9 @@ app.route("/", webhook);
 
 // Google OAuth2
 app.route("/", auth);
+
+// Dashboard
+app.route("/", dashboard);
 
 const port = Number(process.env["PORT"]) || 3000;
 console.log(`Server running on http://localhost:${port}`);

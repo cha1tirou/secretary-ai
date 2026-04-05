@@ -153,20 +153,26 @@ export async function classifyIntent(text: string): Promise<ClassifyResult> {
 
 // ── メール分類（2フェーズ） ──
 
-const NEWSLETTER_FROM_PATTERNS = /no-?reply|noreply|newsletter|notification|donotreply|info@/i;
+const NEWSLETTER_FROM_PATTERNS = /no-?reply|noreply|newsletter|notifications?|donotreply|marketing|promo|promotions?|updates?|automated|system@|auto@|info@/i;
 const URGENT_KEYWORDS = /至急|ASAP|本日中|今日中|緊急|urgent/i;
+const UNSUBSCRIBE_PATTERNS = /配信停止|購読解除|受信拒否|unsubscribe|opt.?out|メール配信を停止|このメールの配信を/i;
+const PROMO_SUBJECT = /\d+%オフ|\d+%OFF|割引クーポン|セール|キャンペーン|期間限定|特別価格/i;
+const CORP_FROM = /[@.](com|co\.jp|net|org)/i;
+const REPLY_NEEDED_SUBJECT = /ご確認ください|ご返信ください|お返事|返信をお願い|教えてください|いかがでしょうか/;
 
 const VALID_PERSONAL_CATEGORIES: EmailCategory[] = [
-  "reply_later", "action_needed", "fyi",
+  "newsletter", "reply_later", "action_needed", "fyi",
 ];
 
 /**
- * フェーズ1: ルールベースの送信者フィルタ
- * newsletter と判定できれば即確定、それ以外は null を返す
+ * フェーズ1: ルールベースのメルマガ判定
  */
 function detectNewsletter(email: Email, userEmail?: string): boolean {
   // List-Unsubscribe / List-Id ヘッダーの存在
   if (email.listUnsubscribe || email.listId) return true;
+
+  // Precedence ヘッダー
+  if (email.precedence && /bulk|list|junk/i.test(email.precedence)) return true;
 
   // From に自動送信パターンを含む
   if (NEWSLETTER_FROM_PATTERNS.test(email.from)) return true;
@@ -178,12 +184,17 @@ function detectNewsletter(email: Email, userEmail?: string): boolean {
     if (!recipients.includes(addr)) return true;
   }
 
+  // 本文の冒頭に配信停止パターン
+  if (UNSUBSCRIBE_PATTERNS.test(email.body.slice(0, 300))) return true;
+
+  // 件名がプロモーション系 + 送信者が企業ドメイン
+  if (PROMO_SUBJECT.test(email.subject) && CORP_FROM.test(email.from)) return true;
+
   return false;
 }
 
 /**
  * urgent キーワード検出（件名・本文）
- * 該当すれば Haiku 不要で urgent_reply 確定
  */
 function detectUrgent(email: Email): boolean {
   return URGENT_KEYWORDS.test(email.subject + " " + email.body);
@@ -204,18 +215,24 @@ function classifyPersonalByRegex(email: Email): EmailCategory {
 }
 
 const PERSONAL_EMAIL_SYSTEM_PROMPT = `あなたはメールを分類するアシスタントです。
-このメールは個人から送られたメールです（メルマガ・自動送信ではありません）。
-以下の3カテゴリから最も適切なものを1つ選んでください。
+以下の4カテゴリから最も適切なものを1つ選んでください。
 
-- reply_later: 返信が必要（数日以内でOK）
-- action_needed: 返信不要だが自分の行動が必要（締切・依頼等）
-- fyi: 読むだけでOK
+- newsletter: メルマガ・広告・自動通知・サービスからの一斉配信・定期配信
+- reply_later: 個人からのメールで返信が必要（数日以内でOK）
+- action_needed: 返信不要だが自分の行動が必要（締切・資料提出・確認等）
+- fyi: 個人からのメールで読むだけでOK・返信不要
+
+判断のポイント：
+- 「配信停止」「unsubscribe」があればnewsletter
+- 特定の個人に向けた内容でなければnewsletter
+- 質問・依頼・日程調整・確認依頼はreply_later
+- お知らせ・領収書・自動送信はnewsletter
 
 JSON形式で回答: {"category": "..."}`;
 
 /**
  * メール分類メイン関数
- * フェーズ1（ルールベース）→ フェーズ2（Haiku 3択）の2段構成
+ * フェーズ1（ルールベース）→ フェーズ2（Haiku 4択）の2段構成
  */
 export async function classifyEmail(email: Email, userEmail?: string): Promise<EmailCategory> {
   // フェーズ1: メルマガ判定
@@ -228,7 +245,12 @@ export async function classifyEmail(email: Email, userEmail?: string): Promise<E
     return "urgent_reply";
   }
 
-  // フェーズ2: 個人メールの3択分類
+  // 件名で明確にreply_laterと判断できるケース（Haiku不要・コスト節約）
+  if (REPLY_NEEDED_SUBJECT.test(email.subject)) {
+    return "reply_later";
+  }
+
+  // フェーズ2: Haiku 4択分類
   if (isDev) {
     return classifyPersonalByRegex(email);
   }

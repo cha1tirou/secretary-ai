@@ -10,6 +10,7 @@ export type Email = {
   isUnread: boolean;
   listUnsubscribe: string;
   listId: string;
+  precedence: string;
 };
 
 export type CalendarEvent = {

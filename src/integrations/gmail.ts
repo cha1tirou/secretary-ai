@@ -98,6 +98,7 @@ async function getUnreadEmailsForAccount(
       isUnread: true,
       listUnsubscribe: extractHeader(headers, "List-Unsubscribe"),
       listId: extractHeader(headers, "List-Id"),
+      precedence: extractHeader(headers, "Precedence"),
     });
   }
 
@@ -186,6 +187,7 @@ async function getAllEmailsForAccount(
       isUnread: labelIds.includes("UNREAD"),
       listUnsubscribe: extractHeader(headers, "List-Unsubscribe"),
       listId: extractHeader(headers, "List-Id"),
+      precedence: extractHeader(headers, "Precedence"),
     });
   }
 
@@ -272,6 +274,7 @@ async function getSentEmailsForAccount(
       isUnread: false,
       listUnsubscribe: extractHeader(headers, "List-Unsubscribe"),
       listId: extractHeader(headers, "List-Id"),
+      precedence: extractHeader(headers, "Precedence"),
     });
   }
 
@@ -365,6 +368,7 @@ async function getThreadForAccount(
       isUnread: labelIds.includes("UNREAD"),
       listUnsubscribe: extractHeader(headers, "List-Unsubscribe"),
       listId: extractHeader(headers, "List-Id"),
+      precedence: extractHeader(headers, "Precedence"),
     };
   });
 }

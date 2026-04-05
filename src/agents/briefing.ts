@@ -2,7 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { getTodayEvents, getTomorrowEvents } from "../integrations/gcal.js";
 import { getUnreadEmails, getSentEmails, checkThreadReplied } from "../integrations/gmail.js";
 import { getWeatherSummary, getTomorrowWeatherSummary } from "../integrations/weather.js";
-import { getGoogleAccountsByUserId, countProcessedEmailsByCategory, getProcessedEmailsByCategory } from "../db/queries.js";
+import { getDb, getGoogleAccountsByUserId, countProcessedEmailsByCategory, getProcessedEmailsByCategory } from "../db/queries.js";
 import type { CalendarEvent, Email } from "../types.js";
 
 const isDev = process.env["NODE_ENV"] === "development";
@@ -16,6 +16,15 @@ function fmtTime(isoStr: string): string {
 
 function fmtFrom(from: string): string {
   return (from.split("<")[0] ?? "").trim() || from;
+}
+
+function getUnrepliedMessageIds(userId: string): string[] {
+  const rows = getDb().prepare(`
+    SELECT pe.message_id FROM processed_emails pe
+    WHERE pe.user_id = ?
+      AND pe.category IN ('urgent_reply', 'reply_later')
+  `).all(userId) as { message_id: string }[];
+  return rows.map((r) => r.message_id);
 }
 
 // ── Types ──
@@ -195,10 +204,18 @@ export async function generateNoonBriefing(userId: string): Promise<string> {
       }
     }
 
-    const emails = await getUnreadEmails(userId).catch(() => [] as Email[]);
-    if (emails.length > 0) {
+    const unrepliedIds = getUnrepliedMessageIds(userId);
+    if (unrepliedIds.length > 0) {
       text += `\n\u2501\u2501 \u6C17\u306B\u306A\u308B\u3053\u3068 \u2501\u2501\n`;
-      text += `\u30FB\u672A\u5BFE\u5FDC\u30E1\u30FC\u30EB\u304C${emails.length}\u4EF6\u3042\u308A\u307E\u3059\n`;
+      text += `\u30FB\u672A\u5BFE\u5FDC\u30E1\u30FC\u30EB\u304C${unrepliedIds.length}\u4EF6\u3042\u308A\u307E\u3059\n`;
+      // 件名を最大3件表示
+      const unread = await getUnreadEmails(userId).catch(() => [] as Email[]);
+      const matched = unrepliedIds.slice(0, 3)
+        .map((id) => unread.find((e) => e.id === id))
+        .filter((e): e is Email => e !== undefined);
+      for (const e of matched) {
+        text += `  \u30FB${fmtFrom(e.from)}: ${e.subject}\n`;
+      }
     }
 
     text += `\n\u2192 \u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9\u3067\u78BA\u8A8D\nhttps://web-production-b2798.up.railway.app/dashboard?token=${userId}`;
@@ -214,17 +231,18 @@ export async function generateNoonBriefing(userId: string): Promise<string> {
 
 export async function generateEveningBriefing(userId: string): Promise<string> {
   try {
-    const [emails, tomorrowEvents, tomorrowWeather] = await Promise.all([
-      getUnreadEmails(userId).catch(() => [] as Email[]),
+    const [tomorrowEvents, tomorrowWeather] = await Promise.all([
       getTomorrowEvents(userId).catch(() => [] as CalendarEvent[]),
       getTomorrowWeatherSummary().catch(() => ""),
     ]);
 
+    const unrepliedIds = getUnrepliedMessageIds(userId);
+
     let text = "\u304A\u75B2\u308C\u3055\u307E\u3067\u3057\u305F\u3002\n";
 
-    if (emails.length > 0) {
+    if (unrepliedIds.length > 0) {
       text += `\n\u2501\u2501 \u4ECA\u65E5\u306E\u7A4D\u307F\u6B8B\u3057 \u2501\u2501\n`;
-      text += `\u30FB\u672A\u5BFE\u5FDC\u30E1\u30FC\u30EB\u304C${emails.length}\u4EF6\u3042\u308A\u307E\u3059\n`;
+      text += `\u30FB\u672A\u5BFE\u5FDC\u30E1\u30FC\u30EB\u304C${unrepliedIds.length}\u4EF6\u3042\u308A\u307E\u3059\n`;
     }
 
     text += `\n\u2501\u2501 \u660E\u65E5\u306E\u4E88\u5B9A \u2501\u2501\n`;
@@ -240,7 +258,7 @@ export async function generateEveningBriefing(userId: string): Promise<string> {
 
     if (tomorrowWeather) text += `\n${tomorrowWeather}\n`;
 
-    if (emails.length > 0) {
+    if (unrepliedIds.length > 0) {
       text += `\n\u2192 \u7A4D\u307F\u6B8B\u3057\u306F\u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9\u304B\u3089\nhttps://web-production-b2798.up.railway.app/dashboard?token=${userId}\n`;
     }
 

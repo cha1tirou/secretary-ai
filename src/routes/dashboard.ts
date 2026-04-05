@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { getUnreadEmails, getSentEmails, checkThreadReplied, getThread, sendReply } from "../integrations/gmail.js";
 import { generateReply } from "../agents/reply.js";
 import {
+  getDb,
   getGoogleAccountsByUserId,
   getUser,
   getPendingRepliesByStatus,
@@ -39,29 +40,40 @@ dashboard.get("/dashboard", async (c) => {
       </body></html>`);
     }
 
+    // 要返信メール: processed_emailsのurgent_reply/reply_laterに絞る
+    const db = getDb();
+    const unrepliedRows = db.prepare(`
+      SELECT pe.message_id, pe.category FROM processed_emails pe
+      WHERE pe.user_id = ?
+        AND pe.category IN ('urgent_reply', 'reply_later')
+      ORDER BY pe.processed_at DESC
+      LIMIT 10
+    `).all(userId) as { message_id: string; category: string }[];
+
     const unread = await getUnreadEmails(userId).catch(() => [] as Email[]);
+    const unrepliedEmails = unrepliedRows
+      .map((row) => unread.find((e) => e.id === row.message_id))
+      .filter((e): e is Email => e !== undefined);
+
+    // 返信待ちメール: 送信済みで3日以上返信なし
     const sent = await getSentEmails(userId, 20).catch(() => [] as Email[]);
-
     const myEmails = accounts.map((a) => a.email).filter((e): e is string => e !== null);
-
     const awaitingReply: (Email & { daysAgo: number })[] = [];
     if (myEmails.length > 0) {
       for (const email of sent.slice(0, 20)) {
+        const sentDate = new Date(email.date).getTime();
+        if (isNaN(sentDate)) continue;
+        const daysAgo = Math.floor((Date.now() - sentDate) / 86400000);
+        if (daysAgo < 3) continue;
         const replied = await checkThreadReplied(email.threadId, userId, myEmails).catch(() => true);
         if (!replied) {
-          const sentDate = new Date(email.date).getTime();
-          if (isNaN(sentDate)) continue;
-          const daysAgo = Math.floor((Date.now() - sentDate) / 86400000);
-          if (daysAgo >= 3) {
-            awaitingReply.push({ ...email, daysAgo });
-            if (awaitingReply.length >= 5) break;
-          }
+          awaitingReply.push({ ...email, daysAgo });
+          if (awaitingReply.length >= 5) break;
         }
       }
     }
 
-    const pending = getPendingRepliesByStatus(userId, "pending");
-    return c.html(buildDashboardHtml(userId, unread, awaitingReply, pending));
+    return c.html(buildDashboardHtml(userId, unrepliedEmails, awaitingReply));
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[dashboard] GET /dashboard error:", msg, err);
@@ -198,6 +210,42 @@ dashboard.post("/reply/skip", async (c) => {
   }
 });
 
+// ── POST /dashboard/send-reminder ──
+dashboard.post("/dashboard/send-reminder", async (c) => {
+  const userId = getToken(c);
+  if (!userId) return c.text("token required", 401);
+
+  try {
+    const body = await c.req.parseBody();
+    const threadId = (body["threadId"] as string) ?? "";
+    const to = (body["to"] as string) ?? "";
+    const subject = (body["subject"] as string) ?? "";
+
+    const Anthropic = (await import("@anthropic-ai/sdk")).default;
+    const client = new Anthropic();
+    const msg = await client.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 512,
+      messages: [{
+        role: "user",
+        content: `\u4EE5\u4E0B\u306E\u30E1\u30FC\u30EB\u3078\u306E\u8FD4\u4FE1\u3092\u4E01\u5BE7\u306B\u50AC\u4FC3\u3059\u308B\u30E1\u30FC\u30EB\u3092\u66F8\u3044\u3066\u304F\u3060\u3055\u3044\u3002\n\u4EF6\u540D: ${subject}\n\u5B9B\u5148: ${to}\n\u50AC\u4FC3\u30E1\u30FC\u30EB\u672C\u6587\u306E\u307F\u3092\u51FA\u529B\u3057\u3066\u304F\u3060\u3055\u3044\u3002`,
+      }],
+    });
+    const draft = msg.content[0]?.type === "text" ? msg.content[0].text : "";
+
+    await sendReply(userId, threadId, to, subject.startsWith("Re:") ? subject : `Re: ${subject}`, draft);
+
+    return c.html(`<!DOCTYPE html><html><body style="font-family:sans-serif;text-align:center;padding:40px">
+      <p style="font-size:48px">\u2705</p>
+      <p style="font-size:20px">\u50AC\u4FC3\u30E1\u30FC\u30EB\u3092\u9001\u4FE1\u3057\u307E\u3057\u305F</p>
+      <a href="/dashboard?token=${userId}" style="color:#06C755">\u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9\u306B\u623B\u308B</a>
+    </body></html>`);
+  } catch (err) {
+    console.error("[dashboard] send-reminder error:", err);
+    return c.text("Internal Server Error", 500);
+  }
+});
+
 // ── HTML builders ──
 
 function esc(str: string): string {
@@ -210,13 +258,12 @@ function fmtFrom(from: string): string {
 
 function buildDashboardHtml(
   userId: string,
-  unread: Email[],
+  unrepliedEmails: Email[],
   awaitingReply: (Email & { daysAgo: number })[],
-  _pending: PendingReply[],
 ): string {
   const token = userId;
 
-  const unrepliedRows = unread.slice(0, 10).map((e) => `
+  const unrepliedRows = unrepliedEmails.slice(0, 10).map((e) => `
     <div style="border:1px solid #e5e7eb;border-radius:12px;padding:16px;margin-bottom:12px">
       <div style="font-weight:600;margin-bottom:4px">${esc(fmtFrom(e.from))}</div>
       <div style="color:#6b7280;font-size:14px;margin-bottom:12px">${esc(e.subject)}</div>
@@ -248,7 +295,13 @@ function buildDashboardHtml(
     <div style="border:1px solid #e5e7eb;border-radius:12px;padding:16px;margin-bottom:12px">
       <div style="font-weight:600;margin-bottom:4px">${esc(to)}\u3055\u3093\u3078</div>
       <div style="color:#6b7280;font-size:14px;margin-bottom:4px">${esc(e.subject)}</div>
-      <div style="color:#f59e0b;font-size:13px">\u2190 ${e.daysAgo}\u65E5\u7D4C\u904E\u3001\u8FD4\u4FE1\u5F85\u3061</div>
+      <div style="color:#f59e0b;font-size:13px;margin-bottom:12px">\u2190 ${e.daysAgo}\u65E5\u7D4C\u904E\u3001\u8FD4\u4FE1\u5F85\u3061</div>
+      <form method="POST" action="/dashboard/send-reminder?token=${token}" style="display:inline">
+        <input type="hidden" name="threadId" value="${esc(e.threadId)}">
+        <input type="hidden" name="to" value="${esc(e.to ?? "")}">
+        <input type="hidden" name="subject" value="${esc(e.subject)}">
+        <button type="submit" style="background:#f59e0b;color:white;border:none;border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer">\u50AC\u4FC3\u30E1\u30FC\u30EB\u3092\u9001\u308B</button>
+      </form>
     </div>`;
   }).join("");
 

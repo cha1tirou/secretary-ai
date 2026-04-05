@@ -1,5 +1,5 @@
 import cron from "node-cron";
-import { messagingApi, type QuickReplyItem } from "@line/bot-sdk";
+import { messagingApi } from "@line/bot-sdk";
 import { getUnreadEmails, getThread } from "../integrations/gmail.js";
 import { getTodayEvents } from "../integrations/gcal.js";
 import { generateReply } from "../agents/reply.js";
@@ -22,16 +22,6 @@ function getClient() {
   });
 }
 
-function makeQuickReply(pendingId: number): { items: QuickReplyItem[] } {
-  return {
-    items: [
-      { type: "action", action: { type: "message", label: "\u9001\u4FE1", text: `\u9001\u4FE1 ${pendingId}` } },
-      { type: "action", action: { type: "message", label: "\u4FDD\u7559", text: `\u4FDD\u7559 ${pendingId}` } },
-      { type: "action", action: { type: "message", label: "\u30AD\u30E3\u30F3\u30BB\u30EB", text: `\u30AD\u30E3\u30F3\u30BB\u30EB ${pendingId}` } },
-    ],
-  };
-}
-
 async function draftAndNotify(
   client: messagingApi.MessagingApiClient,
   email: Email,
@@ -41,7 +31,7 @@ async function draftAndNotify(
   const thread = await getThread(email.threadId, userId);
   const draft = await generateReply(thread, userId);
 
-  const pendingId = createPendingReply({
+  createPendingReply({
     userId,
     threadId: email.threadId,
     toAddress: email.from,
@@ -57,7 +47,6 @@ async function draftAndNotify(
       {
         type: "text",
         text: `${label}\n\nFrom: ${from}\n\u4EF6\u540D: ${email.subject}\n\n---\n${draft}\n\n\u2192 \u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9\u3067\u51E6\u7406\u3059\u308B\nhttps://web-production-b2798.up.railway.app/dashboard?token=${userId}`,
-        quickReply: makeQuickReply(pendingId),
       },
     ],
   });

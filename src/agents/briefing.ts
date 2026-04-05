@@ -151,9 +151,10 @@ function buildMorningMock(ctx: MorningContext): string {
 
 export async function generateBriefing(userId: string): Promise<string> {
   const ctx = await buildMorningContext(userId);
+  const dashboardLink = `\n\n\u2192 \u30E1\u30FC\u30EB\u51E6\u7406\u306F\u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9\u304B\u3089\nhttps://web-production-b2798.up.railway.app/dashboard?token=${userId}`;
 
   if (isDev) {
-    return buildMorningMock(ctx);
+    return buildMorningMock(ctx) + dashboardLink;
   }
 
   try {
@@ -164,11 +165,11 @@ export async function generateBriefing(userId: string): Promise<string> {
       messages: [{ role: "user", content: buildMorningPrompt(ctx) }],
     });
     const block = message.content[0];
-    if (block?.type === "text") return block.text;
+    if (block?.type === "text") return block.text + dashboardLink;
   } catch (err) {
     console.error("[briefing] Haiku\u30A8\u30E9\u30FC\u3001\u30E2\u30C3\u30AF\u306B\u30D5\u30A9\u30FC\u30EB\u30D0\u30C3\u30AF:", err);
   }
-  return buildMorningMock(ctx);
+  return buildMorningMock(ctx) + dashboardLink;
 }
 
 // ── Noon Briefing (12:00, Rule-based) ──
@@ -199,6 +200,8 @@ export async function generateNoonBriefing(userId: string): Promise<string> {
       text += `\n\u2501\u2501 \u6C17\u306B\u306A\u308B\u3053\u3068 \u2501\u2501\n`;
       text += `\u30FB\u672A\u5BFE\u5FDC\u30E1\u30FC\u30EB\u304C${emails.length}\u4EF6\u3042\u308A\u307E\u3059\n`;
     }
+
+    text += `\n\u2192 \u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9\u3067\u78BA\u8A8D\nhttps://web-production-b2798.up.railway.app/dashboard?token=${userId}`;
 
     return text.trim();
   } catch (err) {
@@ -236,6 +239,10 @@ export async function generateEveningBriefing(userId: string): Promise<string> {
     }
 
     if (tomorrowWeather) text += `\n${tomorrowWeather}\n`;
+
+    if (emails.length > 0) {
+      text += `\n\u2192 \u7A4D\u307F\u6B8B\u3057\u306F\u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9\u304B\u3089\nhttps://web-production-b2798.up.railway.app/dashboard?token=${userId}\n`;
+    }
 
     text += "\n\u660E\u65E5\u3082\u3088\u3044\u4E00\u65E5\u3092\u3002";
 

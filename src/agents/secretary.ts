@@ -82,7 +82,8 @@ type SimpleCommand =
   | { type: "task_list" }
   | { type: "task_add"; title: string }
   | { type: "task_done"; raw: string }
-  | { type: "hold_list" };
+  | { type: "hold_list" }
+  | { type: "dashboard" };
 
 function matchSimpleCommand(text: string): SimpleCommand | null {
   if (/今日の予定|今日どんな|今日何がある/.test(text)) return { type: "today_schedule" };
@@ -99,6 +100,7 @@ function matchSimpleCommand(text: string): SimpleCommand | null {
   if (/完了|終わった|やった/.test(text) && /タスク|\d/.test(text)) return { type: "task_done", raw: text };
   if (/タスク|やること|todo/i.test(text)) return { type: "task_list" };
   if (/保留|保留メール/.test(text)) return { type: "hold_list" };
+  if (/ダッシュボード|メール処理|メール作業|返信まとめ/.test(text)) return { type: "dashboard" };
 
   return null;
 }
@@ -274,6 +276,10 @@ async function execSimpleCommand(cmd: SimpleCommand, userId: string): Promise<st
       }
       text += "\n\n操作: 「送信 #番号」「キャンセル #番号」";
       return text;
+    }
+    case "dashboard": {
+      const baseUrl = "https://web-production-b2798.up.railway.app";
+      return `\uD83D\uDCEC \u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9\u306F\u3053\u3061\u3089\u304B\u3089\u958B\u3051\u307E\u3059\u3002\n\n${baseUrl}/dashboard?token=${userId}\n\n\u8981\u8FD4\u4FE1\u30E1\u30FC\u30EB\u306E\u51E6\u7406\u3084\u8FD4\u4FE1\u5F85\u3061\u30E1\u30FC\u30EB\u306E\u78BA\u8A8D\u304C\u3067\u304D\u307E\u3059\u3002`;
     }
   }
 }
@@ -626,6 +632,10 @@ async function lightPlanProcessor(userId: string, message: string): Promise<stri
     }
     text += "\n\n操作: 「送信 #番号」「キャンセル #番号」";
     return text;
+  }
+  if (/ダッシュボード|メール処理|メール作業|返信まとめ/.test(message)) {
+    const baseUrl = "https://web-production-b2798.up.railway.app";
+    return `\uD83D\uDCEC \u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9\u306F\u3053\u3061\u3089\u304B\u3089\u958B\u3051\u307E\u3059\u3002\n\n${baseUrl}/dashboard?token=${userId}\n\n\u8981\u8FD4\u4FE1\u30E1\u30FC\u30EB\u306E\u51E6\u7406\u3084\u8FD4\u4FE1\u5F85\u3061\u30E1\u30FC\u30EB\u306E\u78BA\u8A8D\u304C\u3067\u304D\u307E\u3059\u3002`;
   }
 
   return LIGHT_UPGRADE_MESSAGE;

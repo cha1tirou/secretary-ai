@@ -1,6 +1,6 @@
 import cron from "node-cron";
 import { messagingApi, type QuickReplyItem } from "@line/bot-sdk";
-import { getUnreadEmails, getThread, getSentEmails, checkThreadReplied } from "../integrations/gmail.js";
+import { getUnreadEmails, getThread } from "../integrations/gmail.js";
 import { getTodayEvents } from "../integrations/gcal.js";
 import { generateReply } from "../agents/reply.js";
 import { classifyEmail, extractTasksFromEmail } from "../agents/classifier.js";
@@ -56,7 +56,7 @@ async function draftAndNotify(
     messages: [
       {
         type: "text",
-        text: `${label}\n\nFrom: ${from}\n\u4EF6\u540D: ${email.subject}\n\n---\n${draft}`,
+        text: `${label}\n\nFrom: ${from}\n\u4EF6\u540D: ${email.subject}\n\n---\n${draft}\n\n\u2192 \u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9\u3067\u51E6\u7406\u3059\u308B\nhttps://web-production-b2798.up.railway.app/dashboard?token=${userId}`,
         quickReply: makeQuickReply(pendingId),
       },
     ],
@@ -169,67 +169,10 @@ async function checkNewEmails() {
   }
 }
 
-// ── 毎日15時: 未返信メールリマインド ──
-
-async function checkUnrepliedEmailsForUser(client: messagingApi.MessagingApiClient, userId: string) {
-  try {
-    const accounts = getGoogleAccountsByUserId(userId);
-    const myEmails = accounts.map((a) => a.email).filter((e): e is string => e !== null);
-    if (myEmails.length === 0) return;
-
-    const sentEmails = await getSentEmails(userId, 20);
-    const threeDaysAgo = Date.now() - 3 * 86400000;
-    const unreplied: { from: string; subject: string; daysAgo: number }[] = [];
-
-    for (const sent of sentEmails) {
-      const sentDate = new Date(sent.date).getTime();
-      if (sentDate > threeDaysAgo) continue;
-      if (unreplied.length >= 5) break;
-
-      const replied = await checkThreadReplied(sent.threadId, userId, myEmails);
-      if (!replied) {
-        const daysAgo = Math.floor((Date.now() - sentDate) / 86400000);
-        const to = (sent.to.split("<")[0] ?? "").trim() || sent.to;
-        unreplied.push({ from: to, subject: sent.subject, daysAgo });
-      }
-    }
-
-    if (unreplied.length === 0) return;
-
-    let text = "\uD83D\uDCEC \u8FD4\u4FE1\u5F85\u3061\u306E\u30E1\u30FC\u30EB\u304C\u3042\u308A\u307E\u3059\n";
-    for (const u of unreplied) {
-      text += `\n\u30FB${u.from}\u300C${u.subject}\u300D\u2190 ${u.daysAgo}\u65E5\u7D4C\u904E`;
-    }
-
-    await client.pushMessage({
-      to: userId,
-      messages: [{ type: "text", text }],
-    });
-    console.log(`[auto-draft] \u672A\u8FD4\u4FE1\u30EA\u30DE\u30A4\u30F3\u30C9\u9001\u4FE1: ${userId} (${unreplied.length}\u4EF6)`);
-  } catch (err) {
-    console.error(`[auto-draft] \u672A\u8FD4\u4FE1\u30C1\u30A7\u30C3\u30AF\u30A8\u30E9\u30FC (${userId}):`, err);
-  }
-}
-
-async function checkUnrepliedEmails() {
-  console.log(`[auto-draft] \u672A\u8FD4\u4FE1\u30C1\u30A7\u30C3\u30AF\u958B\u59CB: ${new Date().toISOString()}`);
-  const userIds = getAllUserIds();
-  if (userIds.length === 0) return;
-
-  const client = getClient();
-  for (const userId of userIds) {
-    const accounts = getGoogleAccountsByUserId(userId);
-    if (accounts.length === 0) continue;
-    await checkUnrepliedEmailsForUser(client, userId);
-  }
-}
-
 export function startAutoDraft() {
   // 5分おき: 新着分類 + urgent即通知 + 移動リマインド
   cron.schedule("*/5 * * * *", checkNewEmails);
-  // 毎日15時: 未返信メールリマインド
-  cron.schedule("0 15 * * *", checkUnrepliedEmails);
-  console.log("[auto-draft] \u30B9\u30B1\u30B8\u30E5\u30FC\u30EB\u767B\u9332\u5B8C\u4E86 (5\u5206\u304A\u304D\u5206\u985E + 15\u6642\u672A\u8FD4\u4FE1\u30C1\u30A7\u30C3\u30AF)");
+  console.log("[auto-draft] \u30B9\u30B1\u30B8\u30E5\u30FC\u30EB\u767B\u9332\u5B8C\u4E86 (5\u5206\u304A\u304D\u5206\u985E)");
 }
 
-export { checkNewEmails, checkUnrepliedEmails };
+export { checkNewEmails };

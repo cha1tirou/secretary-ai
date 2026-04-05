@@ -21,262 +21,193 @@ function getBaseUrl(): string {
   );
 }
 
-function chatBubble(align: "right" | "left", text: string) {
-  const isUser = align === "right";
+function featureRow(icon: string, title: string, desc: string) {
   return {
-    type: "box" as const,
-    layout: "horizontal" as const,
-    justifyContent: isUser ? "flex-end" as const : "flex-start" as const,
-    contents: [{
-      type: "box" as const,
-      layout: "vertical" as const,
-      backgroundColor: isUser ? "#06C755" : "#ffffff",
-      cornerRadius: "16px",
-      paddingAll: "12px",
-      maxWidth: "85%",
-      contents: [{
-        type: "text" as const,
-        text,
-        size: "sm" as const,
-        color: isUser ? "#ffffff" : "#333333",
-        wrap: true,
-      }],
-    }],
-  };
-}
-
-function featureCard(icon: string, title: string, desc: string) {
-  return {
-    type: "box" as const,
-    layout: "vertical" as const,
-    backgroundColor: "#ffffff",
-    cornerRadius: "12px",
-    paddingAll: "14px",
-    spacing: "xs" as const,
-    flex: 1,
+    type: "box" as const, layout: "horizontal" as const, spacing: "md" as const,
     contents: [
-      { type: "text" as const, text: icon, size: "xxl" as const, align: "center" as const },
-      { type: "text" as const, text: title, size: "sm" as const, weight: "bold" as const, align: "center" as const },
-      { type: "text" as const, text: desc, size: "xxs" as const, color: "#888888", align: "center" as const, wrap: true },
+      { type: "text" as const, text: icon, size: "xl" as const, flex: 0 },
+      { type: "box" as const, layout: "vertical" as const, flex: 1,
+        contents: [
+          { type: "text" as const, text: title, weight: "bold" as const, size: "sm" as const },
+          { type: "text" as const, text: desc, size: "xs" as const, color: "#888888", wrap: true },
+        ],
+      },
     ],
   };
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function buildWelcomeMessages(userId: string, authUrl: string): any[] {
-  // ── 1通目：サービス紹介（2×2 グリッド） ──
+function buildWelcomeMessages(authUrl: string): { batch1: any[]; batch2: any[] } {
+  // ── 1通目: introFlex（全体紹介） ──
   const introFlex = {
     type: "flex",
-    altText: "AI秘書へようこそ！",
+    altText: "AI\u79D8\u66F8\u3078\u3088\u3046\u3053\u305D\uFF01",
     contents: {
-      type: "bubble",
-      size: "giga",
+      type: "bubble", size: "giga",
       header: {
-        type: "box", layout: "vertical",
-        backgroundColor: "#1a1a2e",
-        paddingAll: "20px",
-        contents: [
-          { type: "text", text: "🤖 AI秘書", color: "#ffffff", weight: "bold", size: "xl" },
-          { type: "text", text: "LINEで話しかけるだけ。メール・予定・タスクを全部動かします。",
-            color: "#cccccc", size: "xs", wrap: true, margin: "sm" },
-        ],
+        type: "box", layout: "vertical", backgroundColor: "#1a1a2e", paddingAll: "20px",
+        contents: [{ type: "text", text: "\uD83E\uDD16 AI\u79D8\u66F8\u3078\u3088\u3046\u3053\u305D\uFF01", color: "#ffffff", weight: "bold", size: "xl" }],
       },
       body: {
-        type: "box", layout: "vertical",
-        backgroundColor: "#f0f0f5",
-        paddingAll: "16px",
-        spacing: "sm",
+        type: "box", layout: "vertical", paddingAll: "20px", spacing: "lg",
         contents: [
-          { type: "box", layout: "horizontal", spacing: "sm",
-            contents: [
-              featureCard("📧", "メール管理", "重要メール通知\n返信文を自動下書き"),
-              featureCard("📅", "予定管理", "カレンダー確認・登録\n空き時間の計算"),
-            ],
-          },
-          { type: "box", layout: "horizontal", spacing: "sm",
-            contents: [
-              featureCard("🌅", "ブリーフィング", "毎朝の予定・メール\nまとめを自動配信"),
-              featureCard("✅", "タスク管理", "メールからタスク検出\n期日リマインド"),
-            ],
-          },
+          featureRow("\uD83D\uDCE1", "Push", "\u5927\u4E8B\u306A\u3053\u3068\u3092\u5148\u56DE\u308A\u3057\u3066\u304A\u77E5\u3089\u305B"),
+          featureRow("\uD83D\uDCEC", "\u30E1\u30FC\u30EB\u51E6\u7406", "\u6E9C\u307E\u3063\u305F\u30E1\u30FC\u30EB\u4F5C\u696D\u3092AI\u304C\u304A\u624B\u4F1D\u3044"),
+          featureRow("\uD83D\uDCAC", "Pull", "\u30E1\u30FC\u30EB\u30FB\u4E88\u5B9A\u3092\u67D4\u8EDF\u306B\u691C\u7D22\u30FB\u767B\u9332"),
         ],
       },
       footer: {
-        type: "box", layout: "vertical",
-        backgroundColor: "#1a1a2e",
-        paddingAll: "14px",
-        contents: [{
-          type: "text", text: "🎉 7日間無料でお試しいただけます",
-          color: "#ffffff", size: "sm", align: "center", weight: "bold",
-        }],
+        type: "box", layout: "vertical", backgroundColor: "#1a1a2e", paddingAll: "14px",
+        contents: [{ type: "text", text: "\uD83C\uDF89 7\u65E5\u9593\u3001\u5168\u6A5F\u80FD\u3092\u7121\u6599\u3067\u304A\u8A66\u3057\u3044\u305F\u3060\u3051\u307E\u3059", color: "#ffffff", size: "sm", align: "center", weight: "bold" }],
       },
     },
   };
 
-  // ── 2通目：チャット風の使い方例 ──
-  const usageFlex = {
+  // ── 2通目: pushFlex（Push詳細） ──
+  const pushFlex = {
     type: "flex",
-    altText: "こんなふうに話しかけてください",
+    altText: "Push \u2014 \u5148\u56DE\u308A\u3057\u3066\u304A\u77E5\u3089\u305B\u3057\u307E\u3059",
     contents: {
-      type: "bubble",
-      size: "giga",
+      type: "bubble", size: "giga",
       header: {
-        type: "box", layout: "vertical",
-        backgroundColor: "#2c3e50",
-        paddingAll: "20px",
-        contents: [{
-          type: "text", text: "💬 こんなふうに話しかけてください",
-          color: "#ffffff", weight: "bold", size: "md",
-        }],
+        type: "box", layout: "vertical", backgroundColor: "#2c3e50", paddingAll: "20px",
+        contents: [{ type: "text", text: "\uD83D\uDCE1 Push \u2014 \u5148\u56DE\u308A\u3057\u3066\u304A\u77E5\u3089\u305B\u3057\u307E\u3059", color: "#ffffff", weight: "bold", size: "md", wrap: true }],
       },
       body: {
-        type: "box", layout: "vertical",
-        backgroundColor: "#e8e8e8",
-        paddingAll: "16px",
-        spacing: "lg",
+        type: "box", layout: "vertical", paddingAll: "20px", spacing: "md",
         contents: [
-          // 例①
-          { type: "box", layout: "vertical", spacing: "sm",
-            contents: [
-              chatBubble("right", "急ぎのメールある？"),
-              chatBubble("left", "🔴 急ぎ1件\n田中部長「企画書の承認をお願いします」\n\n返信案を作りましょうか？"),
-            ],
-          },
-          { type: "separator" },
-          // 例②
-          { type: "box", layout: "vertical", spacing: "sm",
-            contents: [
-              chatBubble("right", "来週火曜午後3時に鈴木さんとMTG入れて"),
-              chatBubble("left", "📅 登録しました✅\n\n火曜 15:00〜16:00\n「鈴木さんとMTG」"),
-            ],
-          },
-          { type: "separator" },
-          // 例③
-          { type: "box", layout: "vertical", spacing: "sm",
-            contents: [
-              chatBubble("right", "今日の予定は？"),
-              chatBubble("left", "📋 今日の予定（3件）\n\n09:00 朝会\n13:00 ランチ@丸の内\n17:00 週次レビュー"),
-            ],
+          { type: "text", text: "\u671D\u30FB\u6627\u30FB\u591C\u306B\u30D6\u30EA\u30FC\u30D5\u30A3\u30F3\u30B0\u3092\u304A\u5C4A\u3051\u3057\u307E\u3059\u3002\u91CD\u8981\u306A\u30E1\u30FC\u30EB\u304C\u5C4A\u3044\u305F\u3089\u5373\u5EA7\u306B\u304A\u77E5\u3089\u305B\u3057\u307E\u3059\u3002", size: "sm", color: "#555555", wrap: true },
+          { type: "box", layout: "vertical", backgroundColor: "#f0f0f0", cornerRadius: "8px", paddingAll: "14px",
+            contents: [{ type: "text", size: "xs", color: "#333333", wrap: true,
+              text: "\u3010\u671D\u306E\u30D6\u30EA\u30FC\u30D5\u30A3\u30F3\u30B0\u4F8B\u3011\n\u2602\uFE0F \u4ECA\u65E5\u306F\u5348\u5F8C\u304B\u3089\u96E8\u3001\u50B5\u3092\u304A\u5FD8\u308C\u306A\u304F\n\n\u2501\u2501 \u4ECA\u65E5\u306E\u4E88\u5B9A \u2501\u2501\n\u30FB10:00 \u9031\u6B21MTG\n\u30FB18:30 \u4F1A\u98DF\uFF08\u9280\u5EA7\uFF09\u2190 17:50\u51FA\u767A\u63A8\u5968\n\n\u2501\u2501 \u6C17\u306B\u306A\u308B\u3053\u3068 \u2501\u2501\n\u26A0\uFE0F ABC\u793E\u300C\u5951\u7D04\u66F8\u300D\u671F\u65E5\u304C\u4ECA\u65E5\n\u26A0\uFE0F \u5C71\u7530\u3055\u3093\u3078\u306E\u8FD4\u4FE1\u304C3\u65E5\u7D4C\u904E",
+            }],
           },
         ],
       },
     },
   };
 
-  // ── 3通目：セットアップ案内 ──
+  // ── 3通目: mailFlex（メール処理詳細） ──
+  const mailFlex = {
+    type: "flex",
+    altText: "\u30E1\u30FC\u30EB\u51E6\u7406 \u2014 AI\u304C\u304A\u624B\u4F1D\u3044",
+    contents: {
+      type: "bubble", size: "giga",
+      header: {
+        type: "box", layout: "vertical", backgroundColor: "#e67e22", paddingAll: "20px",
+        contents: [{ type: "text", text: "\uD83D\uDCEC \u30E1\u30FC\u30EB\u51E6\u7406 \u2014 \u6E9C\u307E\u3063\u305F\u30E1\u30FC\u30EB\u4F5C\u696D\u3092AI\u304C\u304A\u624B\u4F1D\u3044", color: "#ffffff", weight: "bold", size: "md", wrap: true }],
+      },
+      body: {
+        type: "box", layout: "vertical", paddingAll: "20px", spacing: "md",
+        contents: [
+          { type: "text", text: "\u8FD4\u4FE1\u3057\u305F\u65B9\u304C\u3044\u3044\u30E1\u30FC\u30EB\u3092\u4E26\u3079\u3066\u3001AI\u304C\u8FD4\u4FE1\u3092\u304A\u624B\u4F1D\u3044\u3057\u307E\u3059\u3002", size: "sm", color: "#555555", wrap: true },
+          { type: "text", text: "\u3010\u8FD4\u4FE1\u306E3\u629E\u3011\n\u2460 AI\u304C\u8FD4\u4FE1\u6848\u3092\u4F5C\u308B\n\u2461 \u8981\u70B9\u3092\u4F1D\u3048\u3066AI\u304C\u6E05\u66F8\u3059\u308B\n\u2462 \u5F8C\u3067\u5BFE\u5FDC\u3059\u308B", size: "sm", color: "#333333", wrap: true },
+          { type: "text", text: "\u9001\u4FE1\u3057\u305F\u306E\u306B\u8FD4\u4FE1\u304C\u6765\u3066\u3044\u306A\u3044\u30E1\u30FC\u30EB\u3082\u691C\u77E5\u3057\u3066\u300C\u50AC\u4FC3\u3057\u307E\u3057\u3087\u3046\u304B\uFF1F\u300D\u3068\u63D0\u6848\u3057\u307E\u3059\u3002", size: "xs", color: "#888888", wrap: true },
+          { type: "text", text: "\u51E6\u7406\u306F\u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9\u304B\u3089\uFF08Google\u8A8D\u8A3C\u5F8C\u306B\u500B\u4EBA\u7528URL\u3092\u304A\u9001\u308A\u3057\u307E\u3059\uFF09", size: "xs", color: "#aaaaaa", wrap: true },
+        ],
+      },
+    },
+  };
+
+  // ── 4通目: pullFlex（Pull詳細） ──
+  const pullFlex = {
+    type: "flex",
+    altText: "Pull \u2014 \u30E1\u30FC\u30EB\u30FB\u4E88\u5B9A\u3092\u67D4\u8EDF\u306B\u691C\u7D22\u30FB\u767B\u9332",
+    contents: {
+      type: "bubble", size: "giga",
+      header: {
+        type: "box", layout: "vertical", backgroundColor: "#8e44ad", paddingAll: "20px",
+        contents: [{ type: "text", text: "\uD83D\uDCAC Pull \u2014 \u30E1\u30FC\u30EB\u30FB\u4E88\u5B9A\u3092\u67D4\u8EDF\u306B\u691C\u7D22\u30FB\u767B\u9332", color: "#ffffff", weight: "bold", size: "md", wrap: true }],
+      },
+      body: {
+        type: "box", layout: "vertical", paddingAll: "20px", spacing: "md",
+        contents: [
+          { type: "text", text: "LINE\u3067\u8A71\u3057\u304B\u3051\u308B\u3060\u3051\u3067\u3001\u30E1\u30FC\u30EB\u3084\u4E88\u5B9A\u3092\u3059\u3050\u306B\u691C\u7D22\u30FB\u64CD\u4F5C\u3067\u304D\u307E\u3059\u3002", size: "sm", color: "#555555", wrap: true },
+          { type: "text", text: "\u3010\u4F7F\u3044\u65B9\u4F8B\u3011\n\u30FB\u300C\u5C71\u7530\u3055\u3093\u304B\u3089\u30E1\u30FC\u30EB\u6765\u3066\u308B\uFF1F\u300D\u2192 \u5373\u691C\u7D22\n\u30FB\u300C\u6765\u9031\u306E\u7A7A\u304D\u6642\u9593\u3092\u6559\u3048\u3066\u300D\u2192 \u30AB\u30EC\u30F3\u30C0\u30FC\u3092\u78BA\u8A8D\n\u30FB\u300C\u706B\u66DC\u5348\u5F8C3\u6642\u306B\u9234\u6728\u3055\u3093\u3068MTG\u5165\u308C\u3066\u300D\u2192 \u81EA\u52D5\u767B\u9332\n\u30FB\u300C\u8FD4\u4FE1\u3059\u3079\u304D\u30E1\u30FC\u30EB\u3042\u308B\uFF1F\u300D\u2192 \u4E00\u89A7\u8868\u793A\n\u30FB\u300C\u30BF\u30B9\u30AF\u306B\u25CB\u25CB\u3092\u8FFD\u52A0\u3057\u3066\u300D\u2192 \u30BF\u30B9\u30AF\u30EA\u30B9\u30C8\u306B\u767B\u9332", size: "sm", color: "#333333", wrap: true },
+          { type: "text", text: "\u30E1\u30FC\u30EB\u691C\u7D22\u30FB\u65E5\u7A0B\u8ABF\u6574\u30FB\u30AB\u30EC\u30F3\u30C0\u30FC\u767B\u9332\u30FB\u30BF\u30B9\u30AF\u7BA1\u7406\u306A\u3069\u3001\u67D4\u8EDF\u306B\u5BFE\u5FDC\u3057\u307E\u3059\u3002", size: "xs", color: "#888888", wrap: true },
+        ],
+      },
+    },
+  };
+
+  // ── 5通目: setupFlex（セットアップ） ──
   const setupFlex = {
     type: "flex",
-    altText: "Googleアカウントを連携してはじめましょう",
+    altText: "Google\u30A2\u30AB\u30A6\u30F3\u30C8\u3092\u9023\u643A\u3057\u3066\u306F\u3058\u3081\u307E\u3057\u3087\u3046",
     contents: {
-      type: "bubble",
-      size: "giga",
+      type: "bubble", size: "giga",
       header: {
-        type: "box", layout: "vertical",
-        backgroundColor: "#34a853",
-        paddingAll: "20px",
-        contents: [{
-          type: "text", text: "🔗 セットアップ",
-          color: "#ffffff", weight: "bold", size: "lg",
-        }],
+        type: "box", layout: "vertical", backgroundColor: "#34a853", paddingAll: "20px",
+        contents: [{ type: "text", text: "\uD83D\uDD17 \u30BB\u30C3\u30C8\u30A2\u30C3\u30D7", color: "#ffffff", weight: "bold", size: "lg" }],
       },
       body: {
-        type: "box", layout: "vertical",
-        paddingAll: "20px",
-        spacing: "lg",
+        type: "box", layout: "vertical", paddingAll: "20px", spacing: "lg",
         contents: [
-          // STEP 1
           { type: "box", layout: "horizontal", spacing: "md",
             contents: [
-              { type: "box", layout: "vertical", width: "28px", height: "28px",
-                backgroundColor: "#34a853", cornerRadius: "14px",
-                justifyContent: "center", alignItems: "center",
-                contents: [{ type: "text", text: "✓", color: "#ffffff", size: "xs", align: "center" }],
-              },
+              { type: "box", layout: "vertical", width: "28px", height: "28px", backgroundColor: "#34a853", cornerRadius: "14px", justifyContent: "center", alignItems: "center",
+                contents: [{ type: "text", text: "\u2713", color: "#ffffff", size: "xs", align: "center" }] },
               { type: "box", layout: "vertical", flex: 1,
-                contents: [
-                  { type: "text", text: "STEP 1  LINE友達追加", weight: "bold", size: "sm", color: "#999999",
-                    decoration: "line-through" },
-                ],
-              },
+                contents: [{ type: "text", text: "STEP 1  LINE\u53CB\u9054\u8FFD\u52A0", weight: "bold", size: "sm", color: "#999999", decoration: "line-through" }] },
             ],
           },
-          // STEP 2
           { type: "box", layout: "horizontal", spacing: "md",
             contents: [
-              { type: "box", layout: "vertical", width: "28px", height: "28px",
-                backgroundColor: "#34a853", cornerRadius: "14px",
-                justifyContent: "center", alignItems: "center",
-                contents: [{ type: "text", text: "2", color: "#ffffff", size: "xs", weight: "bold", align: "center" }],
-              },
+              { type: "box", layout: "vertical", width: "28px", height: "28px", backgroundColor: "#34a853", cornerRadius: "14px", justifyContent: "center", alignItems: "center",
+                contents: [{ type: "text", text: "2", color: "#ffffff", size: "xs", weight: "bold", align: "center" }] },
               { type: "box", layout: "vertical", flex: 1, spacing: "xs",
                 contents: [
-                  { type: "text", text: "STEP 2  Googleアカウント連携", weight: "bold", size: "sm", color: "#34a853" },
-                  { type: "text", text: "← 今ここ！下のボタンから連携できます", size: "xs", color: "#34a853" },
-                ],
-              },
+                  { type: "text", text: "STEP 2  Google\u30A2\u30AB\u30A6\u30F3\u30C8\u9023\u643A", weight: "bold", size: "sm", color: "#34a853" },
+                  { type: "text", text: "\u2190 \u4ECA\u3053\u3053\uFF01\u4E0B\u306E\u30DC\u30BF\u30F3\u304B\u3089\u9023\u643A\u3067\u304D\u307E\u3059", size: "xs", color: "#34a853" },
+                ] },
             ],
           },
-          // STEP 3
           { type: "box", layout: "horizontal", spacing: "md",
             contents: [
-              { type: "box", layout: "vertical", width: "28px", height: "28px",
-                backgroundColor: "#dddddd", cornerRadius: "14px",
-                justifyContent: "center", alignItems: "center",
-                contents: [{ type: "text", text: "3", color: "#ffffff", size: "xs", weight: "bold", align: "center" }],
-              },
+              { type: "box", layout: "vertical", width: "28px", height: "28px", backgroundColor: "#dddddd", cornerRadius: "14px", justifyContent: "center", alignItems: "center",
+                contents: [{ type: "text", text: "3", color: "#ffffff", size: "xs", weight: "bold", align: "center" }] },
               { type: "box", layout: "vertical", flex: 1,
-                contents: [
-                  { type: "text", text: "STEP 3  「今日の予定は？」で開始！", weight: "bold", size: "sm", color: "#aaaaaa" },
-                ],
-              },
+                contents: [{ type: "text", text: "STEP 3  \u300C\u4ECA\u65E5\u306E\u4E88\u5B9A\u306F\uFF1F\u300D\u3067\u958B\u59CB\uFF01", weight: "bold", size: "sm", color: "#aaaaaa" }] },
             ],
           },
           { type: "separator" },
-          // セキュリティ説明
-          { type: "box", layout: "vertical",
-            backgroundColor: "#f5f5f5", cornerRadius: "8px", paddingAll: "12px",
-            spacing: "xs",
+          { type: "box", layout: "vertical", backgroundColor: "#f5f5f5", cornerRadius: "8px", paddingAll: "12px", spacing: "xs",
             contents: [
-              { type: "text", text: "🔒 セキュリティについて", size: "xs", weight: "bold" },
-              { type: "text", text: "・OAuth認証のみ使用（パスワードは取得しません）\n・アクセスするのはGmail・Calendarのみ\n・複数アカウントにも後から対応できます",
-                size: "xxs", color: "#666666", wrap: true },
+              { type: "text", text: "\uD83D\uDD12 \u30BB\u30AD\u30E5\u30EA\u30C6\u30A3\u306B\u3064\u3044\u3066", size: "xs", weight: "bold" },
+              { type: "text", text: "\u30FBOAUTH\u8A8D\u8A3C\u306E\u307F\u4F7F\u7528\uFF08\u30D1\u30B9\u30EF\u30FC\u30C9\u306F\u53D6\u5F97\u3057\u307E\u305B\u3093\uFF09\n\u30FB\u30A2\u30AF\u30BB\u30B9\u3059\u308B\u306E\u306FGmail\u30FBCalendar\u306E\u307F\n\u30FB\u8907\u6570\u30A2\u30AB\u30A6\u30F3\u30C8\u306B\u3082\u5F8C\u304B\u3089\u5BFE\u5FDC\u3067\u304D\u307E\u3059", size: "xxs", color: "#666666", wrap: true },
             ],
           },
         ],
       },
       footer: {
-        type: "box", layout: "vertical",
-        paddingAll: "16px",
-        contents: [{
-          type: "button", style: "primary", color: "#34a853", height: "md",
-          action: { type: "uri", label: "Googleアカウントを連携する", uri: authUrl },
-        }],
+        type: "box", layout: "vertical", paddingAll: "16px",
+        contents: [{ type: "button", style: "primary", color: "#34a853", height: "md",
+          action: { type: "uri", label: "Google\u30A2\u30AB\u30A6\u30F3\u30C8\u3092\u9023\u643A\u3059\u308B", uri: authUrl } }],
       },
     },
   };
 
-  // ── 4通目：注意事項テキスト ──
+  // ── 6通目: notice（注意事項テキスト） ──
   const notice = {
     type: "text",
     text: [
-      "📋 ご利用プランについて",
+      "\uD83D\uDCCB \u3054\u5229\u7528\u30D7\u30E9\u30F3\u306B\u3064\u3044\u3066",
       "",
-      "Trial（7日間無料）… 全機能をお試し",
-      "Light（月480円）… ブリーフィング＋メール通知",
-      "Pro （月980円）… 全機能＋自由な対話",
+      "Trial\uFF087\u65E5\u9593\u7121\u6599\uFF09\u2026 \u5168\u6A5F\u80FD\u3092\u304A\u8A66\u3057",
+      "Light\uFF08\u6708480\u5186\uFF09\u2026 \u30D6\u30EA\u30FC\u30D5\u30A3\u30F3\u30B0\uFF0B\u30E1\u30FC\u30EB\u901A\u77E5",
+      "Pro\uFF08\u6708980\u5186\uFF09\u2026 \u5168\u6A5F\u80FD\uFF0B\u81EA\u7531\u306A\u5BFE\u8A71",
       "",
-      "⚠️ 現在α版のため、決済機能は準備中です。",
-      "トライアル終了後のご案内は別途お送りします。",
+      "\u26A0\uFE0F \u73FE\u5728\u03B1\u7248\u306E\u305F\u3081\u6C7A\u6E08\u6A5F\u80FD\u306F\u6E96\u5099\u4E2D\u3067\u3059\u3002",
+      "\u30C8\u30E9\u30A4\u30A2\u30EB\u7D42\u4E86\u5F8C\u306E\u3054\u6848\u5185\u306F\u5225\u9014\u304A\u9001\u308A\u3057\u307E\u3059\u3002",
       "",
-      "ご意見・不具合はいつでもこのLINEに送ってください！",
-      "",
-      "【αテスト参加方法】",
-      "まずこのLINEにあなたのGmailアドレスを送ってください。",
-      "登録後にGoogle連携用のリンクをお送りします。",
+      "\u3054\u610F\u898B\u30FB\u4E0D\u5177\u5408\u306F\u3044\u3064\u3067\u3082\u3053\u306ELINE\u306B\u9001\u3063\u3066\u304F\u3060\u3055\u3044\uFF01",
     ].join("\n"),
   };
 
-  return [introFlex, usageFlex, setupFlex, notice];
+  return {
+    batch1: [introFlex, pushFlex, mailFlex],
+    batch2: [pullFlex, setupFlex, notice],
+  };
 }
 
 // ── コスト最適化 ──
@@ -409,9 +340,10 @@ webhook.post("/webhook", async (c) => {
           .replace("/auth/callback", "")
           || "https://web-production-b2798.up.railway.app";
         const authUrl = `${baseUrl}/auth/start?user=${userId}&label=${encodeURIComponent("アカウント1")}`;
-        const messages = buildWelcomeMessages(userId, authUrl);
-        // LINE push は1回5通まで。4通なのでまとめて送信
-        await client.pushMessage({ to: userId, messages });
+        const { batch1, batch2 } = buildWelcomeMessages(authUrl);
+        // LINE push は1回5通まで。6通なので2回に分けて送信
+        await client.pushMessage({ to: userId, messages: batch1 });
+        await client.pushMessage({ to: userId, messages: batch2 });
         return;
       }
 

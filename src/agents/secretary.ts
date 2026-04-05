@@ -90,8 +90,8 @@ function matchSimpleCommand(text: string): SimpleCommand | null {
   if (/今週の予定|週間|今週どんな/.test(text)) return { type: "week_schedule" };
   if (/今月の予定|今月のスケジュール|今月は何がある/.test(text)) return { type: "month_schedule" };
   if (/空いてる|空き時間|いつ空いてる/.test(text)) return { type: "free_time" };
-  // 「返信すべき」「要返信」系はSonnetに判断を委譲（simple commandにしない）
-  if (/返信すべき|要返信|返信が必要|返さないと|返信.*メール.*ある|メール.*返信/.test(text)) return null;
+  // 「返信すべき」「要返信」系はダッシュボードに誘導
+  if (/返信すべき|要返信|返信が必要|返さないと|返信.*メール.*ある|メール.*返信/.test(text)) return { type: "dashboard" };
   if (/未読|メール来てる|メールチェック/.test(text) && !/重要|急ぎ|至急|大事|優先/.test(text)) return { type: "unread_email" };
 
   const taskAddMatch = text.match(/(.+?)をタスクに/) || ((/タスクに追加/.test(text)) ? [null, text.replace(/タスクに追加|して|を/g, "").trim()] : null);
@@ -120,26 +120,8 @@ function fmtEvents(events: CalendarEvent[]): string {
   }).join("\n");
 }
 
-function fmtWeekEvents(events: CalendarEvent[]): string {
-  if (events.length === 0) return "今週の予定はありません。";
-  const days = ["日", "月", "火", "水", "木", "金", "土"];
-  const grouped = new Map<string, CalendarEvent[]>();
-  for (const e of events) {
-    const d = new Date(e.start);
-    const key = `${d.getMonth() + 1}/${d.getDate()}(${days[d.getDay()]})`;
-    if (!grouped.has(key)) grouped.set(key, []);
-    grouped.get(key)!.push(e);
-  }
-  let text = "";
-  for (const [day, evts] of grouped) {
-    text += `\n${day}\n`;
-    text += evts.map((e) => `　${fmtTime(e.start)} ${e.summary}`).join("\n");
-  }
-  return text.trim();
-}
-
-function fmtMonthEvents(events: CalendarEvent[]): string {
-  if (events.length === 0) return "今月の予定はありません。";
+function fmtGroupedEvents(events: CalendarEvent[], emptyMsg = "予定はありません。"): string {
+  if (events.length === 0) return emptyMsg;
   const days = ["日", "月", "火", "水", "木", "金", "土"];
   const grouped = new Map<string, CalendarEvent[]>();
   for (const e of events) {
@@ -216,7 +198,7 @@ async function execSimpleCommand(cmd: SimpleCommand, userId: string): Promise<st
     }
     case "week_schedule": {
       const events = await getWeekEvents(userId);
-      return `今週の予定（${events.length}件）\n${fmtWeekEvents(events)}`;
+      return `今週の予定（${events.length}件）\n${fmtGroupedEvents(events, "\u4ECA\u9031\u306E\u4E88\u5B9A\u306F\u3042\u308A\u307E\u305B\u3093\u3002")}`;
     }
     case "month_schedule": {
       const events = await getMonthEvents(userId);
@@ -224,7 +206,7 @@ async function execSimpleCommand(cmd: SimpleCommand, userId: string): Promise<st
         ? `今月の予定（${events.length}件あります。最初の10件）`
         : `今月の予定（${events.length}件）`;
       const display = events.slice(0, 10);
-      return `${header}\n${fmtMonthEvents(display)}`;
+      return `${header}\n${fmtGroupedEvents(display, "\u4ECA\u6708\u306E\u4E88\u5B9A\u306F\u3042\u308A\u307E\u305B\u3093\u3002")}`;
     }
     case "free_time": {
       const events = await getWeekEvents(userId);
@@ -508,12 +490,12 @@ function buildSystemPrompt(userId: string): string {
 ルール：
 - 日本語で簡潔に回答する
 - メール送信・カレンダー登録前は必ずユーザーに確認を取る
-- 返答は200文字以内
+- 返答は簡潔に。リスト形式の場合は全件表示する。通常の会話は200文字以内を目安にする
 - 日時は〇月〇日（曜日）HH:MM形式で表記する
 
 メール判断ルール：
 - メールの返信要否はget_emailsで取得してから、本文・件名・差出人を見てあなたが判断する
-- 「返信すべきメール」「要返信メール」と聞かれたら、以下のようにダッシュボードURLを案内する：
+- 「返信すべきメール」「要返信メール」と聞かれたら、以下のテキストをそのまま返す：
   「返信が必要なメールはダッシュボードで確認・処理できます。\n${dashboardUrl}」
 - get_emailsで取得したメールのうち、返信が必要と判断したもの（質問・依頼・日程調整・確認依頼など）だけを返す
 - 返信不要なもの（お知らせ・領収書・自動送信・no-reply）は除外する
@@ -563,7 +545,7 @@ async function lightPlanProcessor(userId: string, message: string): Promise<stri
   }
   if (/今週の予定|週間スケジュール|今週どんな/.test(message)) {
     const events = await getWeekEvents(userId);
-    return `今週の予定（${events.length}件）\n${fmtWeekEvents(events)}`;
+    return `今週の予定（${events.length}件）\n${fmtGroupedEvents(events, "\u4ECA\u9031\u306E\u4E88\u5B9A\u306F\u3042\u308A\u307E\u305B\u3093\u3002")}`;
   }
   if (/今月の予定|今月のスケジュール|今月は何がある/.test(message)) {
     const events = await getMonthEvents(userId);
@@ -571,7 +553,7 @@ async function lightPlanProcessor(userId: string, message: string): Promise<stri
       ? `今月の予定（${events.length}件あります。最初の10件）`
       : `今月の予定（${events.length}件）`;
     const display = events.slice(0, 10);
-    return `${header}\n${fmtMonthEvents(display)}`;
+    return `${header}\n${fmtGroupedEvents(display, "\u4ECA\u6708\u306E\u4E88\u5B9A\u306F\u3042\u308A\u307E\u305B\u3093\u3002")}`;
   }
   if (/空いてる|空き時間|いつ空いてる/.test(message)) {
     const events = await getWeekEvents(userId);
@@ -587,20 +569,23 @@ async function lightPlanProcessor(userId: string, message: string): Promise<stri
     }
     return text;
   }
-  if (/急ぎ|重要.*メール|要返信|返信すべき|返信が必要/.test(message)) {
+  if (/急ぎ|重要.*メール/.test(message)) {
     const emails = await getUnreadEmails(userId);
-    // 簡易判断（LLM不使用）: 件名に急ぎ・返信要のパターンを含むもの
     const needReply = emails.filter((e) => {
       const text = e.subject + e.body;
-      return /急ぎ|至急|urgent|日程|確認|教えて|ご回答|いかがでしょう|お返事/i.test(text);
+      return /急ぎ|至急|urgent/i.test(text);
     });
-    if (needReply.length === 0) return "要返信のメールはありません。";
-    let text = `要返信メール（${needReply.length}件）`;
+    if (needReply.length === 0) return "急ぎのメールはありません。";
+    let text = `急ぎのメール（${needReply.length}件）`;
     for (const e of needReply.slice(0, 5)) {
       const from = (e.from.split("<")[0] ?? "").trim() || e.from;
       text += `\n\n・${from}\n　${e.subject}`;
     }
     return text;
+  }
+  if (/要返信|返信すべき|返信が必要/.test(message)) {
+    const baseUrl = "https://web-production-b2798.up.railway.app";
+    return `\uD83D\uDCEC \u8FD4\u4FE1\u304C\u5FC5\u8981\u306A\u30E1\u30FC\u30EB\u306F\u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9\u3067\u78BA\u8A8D\u30FB\u51E6\u7406\u3067\u304D\u307E\u3059\u3002\n\n${baseUrl}/dashboard?token=${userId}`;
   }
 
   const taskAddMatch = message.match(/(.+?)をタスクに/) || ((/タスクに追加[：:]?\s*(.+)/.exec(message)));
@@ -729,7 +714,7 @@ async function proAgentLoop(userId: string, userText: string): Promise<string> {
   }
 
   // 会話履歴を取得
-  const history = getRecentConversations(userId, 5);
+  const history = getRecentConversations(userId, 10);
   const messages: MessageParam[] = [
     ...history.map((h) => ({ role: h.role, content: h.content }) as MessageParam),
     { role: "user" as const, content: userText },

@@ -1,7 +1,13 @@
 import { Hono } from "hono";
 import { getUnreadEmails, getSentEmails, checkThreadReplied, getThread, sendReply } from "../integrations/gmail.js";
 import { generateReply } from "../agents/reply.js";
-import { getGoogleAccountsByUserId, getPendingRepliesByStatus, createPendingReply, updatePendingReplyStatus } from "../db/queries.js";
+import {
+  getGoogleAccountsByUserId,
+  getPendingRepliesByStatus,
+  getPendingReply,
+  createPendingReply,
+  updatePendingReplyStatus,
+} from "../db/queries.js";
 import type { Email, PendingReply } from "../types.js";
 
 const dashboard = new Hono();
@@ -15,26 +21,35 @@ dashboard.get("/dashboard", async (c) => {
   const userId = getToken(c);
   if (!userId) return c.text("token required", 401);
 
-  const unread = await getUnreadEmails(userId);
+  try {
+    const unread = await getUnreadEmails(userId).catch(() => [] as Email[]);
+    const sent = await getSentEmails(userId, 20).catch(() => [] as Email[]);
 
-  const accounts = getGoogleAccountsByUserId(userId);
-  const myEmails = accounts.map((a) => a.email).filter((e): e is string => e !== null);
-  const sent = await getSentEmails(userId, 20);
-  const awaitingReply: (Email & { daysAgo: number })[] = [];
-  for (const email of sent.slice(0, 20)) {
-    const replied = await checkThreadReplied(email.threadId, userId, myEmails).catch(() => true);
-    if (!replied) {
-      const sentDate = new Date(email.date).getTime();
-      const daysAgo = Math.floor((Date.now() - sentDate) / 86400000);
-      if (daysAgo >= 3) {
-        awaitingReply.push({ ...email, daysAgo });
-        if (awaitingReply.length >= 5) break;
+    const accounts = getGoogleAccountsByUserId(userId);
+    const myEmails = accounts.map((a) => a.email).filter((e): e is string => e !== null);
+
+    const awaitingReply: (Email & { daysAgo: number })[] = [];
+    if (myEmails.length > 0) {
+      for (const email of sent.slice(0, 20)) {
+        const replied = await checkThreadReplied(email.threadId, userId, myEmails).catch(() => true);
+        if (!replied) {
+          const sentDate = new Date(email.date).getTime();
+          if (isNaN(sentDate)) continue;
+          const daysAgo = Math.floor((Date.now() - sentDate) / 86400000);
+          if (daysAgo >= 3) {
+            awaitingReply.push({ ...email, daysAgo });
+            if (awaitingReply.length >= 5) break;
+          }
+        }
       }
     }
-  }
 
-  const pending = getPendingRepliesByStatus(userId, "pending");
-  return c.html(buildDashboardHtml(userId, unread, awaitingReply, pending));
+    const pending = getPendingRepliesByStatus(userId, "pending");
+    return c.html(buildDashboardHtml(userId, unread, awaitingReply, pending));
+  } catch (err) {
+    console.error("[dashboard] GET /dashboard error:", err);
+    return c.text("Internal Server Error", 500);
+  }
 });
 
 // ── POST /dashboard/generate-reply ──
@@ -42,24 +57,28 @@ dashboard.post("/dashboard/generate-reply", async (c) => {
   const userId = getToken(c);
   if (!userId) return c.text("token required", 401);
 
-  const body = await c.req.parseBody();
-  const emailId = body["emailId"] as string;
-  const from = body["from"] as string;
-  const subject = body["subject"] as string;
-  const threadId = body["threadId"] as string;
+  try {
+    const body = await c.req.parseBody();
+    const from = (body["from"] as string) ?? "";
+    const subject = (body["subject"] as string) ?? "";
+    const threadId = (body["threadId"] as string) ?? "";
 
-  const thread = await getThread(threadId, userId);
-  const draft = await generateReply(thread, userId);
+    const thread = await getThread(threadId, userId);
+    const draft = await generateReply(thread, userId);
 
-  const pendingId = createPendingReply({
-    userId,
-    threadId,
-    toAddress: from,
-    subject: subject.startsWith("Re:") ? subject : `Re: ${subject}`,
-    draftContent: draft,
-  });
+    const pendingId = createPendingReply({
+      userId,
+      threadId,
+      toAddress: from,
+      subject: subject.startsWith("Re:") ? subject : `Re: ${subject}`,
+      draftContent: draft,
+    });
 
-  return c.redirect(`/reply?id=${pendingId}&token=${userId}`);
+    return c.redirect(`/reply?id=${pendingId}&token=${userId}`);
+  } catch (err) {
+    console.error("[dashboard] generate-reply error:", err);
+    return c.text("Internal Server Error", 500);
+  }
 });
 
 // ── POST /dashboard/polish-reply ──
@@ -67,72 +86,95 @@ dashboard.post("/dashboard/polish-reply", async (c) => {
   const userId = getToken(c);
   if (!userId) return c.text("token required", 401);
 
-  const body = await c.req.parseBody();
-  const memo = body["memo"] as string;
-  const from = body["from"] as string;
-  const subject = body["subject"] as string;
-  const threadId = body["threadId"] as string;
+  try {
+    const body = await c.req.parseBody();
+    const memo = (body["memo"] as string) ?? "";
+    const from = (body["from"] as string) ?? "";
+    const subject = (body["subject"] as string) ?? "";
+    const threadId = (body["threadId"] as string) ?? "";
 
-  const Anthropic = (await import("@anthropic-ai/sdk")).default;
-  const client = new Anthropic();
-  const msg = await client.messages.create({
-    model: "claude-haiku-4-5-20251001",
-    max_tokens: 512,
-    messages: [{
-      role: "user",
-      content: `\u4EE5\u4E0B\u306E\u30E1\u30E2\u66F8\u304D\u3092\u3082\u3068\u306B\u3001\u30D3\u30B8\u30CD\u30B9\u30E1\u30FC\u30EB\u3068\u3057\u3066\u4E01\u5BE7\u306B\u6E05\u66F8\u3057\u3066\u304F\u3060\u3055\u3044\u3002\n\u5B9B\u5148: ${from}\n\u4EF6\u540D: ${subject}\n\n\u30E1\u30E2:\n${memo}\n\n\u6E05\u66F8\u3057\u305F\u30E1\u30FC\u30EB\u672C\u6587\u306E\u307F\u3092\u51FA\u529B\u3057\u3066\u304F\u3060\u3055\u3044\u3002`,
-    }],
-  });
-  const draft = msg.content[0]?.type === "text" ? msg.content[0].text : memo;
+    const Anthropic = (await import("@anthropic-ai/sdk")).default;
+    const client = new Anthropic();
+    const msg = await client.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 512,
+      messages: [{
+        role: "user",
+        content: `\u4EE5\u4E0B\u306E\u30E1\u30E2\u66F8\u304D\u3092\u3082\u3068\u306B\u3001\u30D3\u30B8\u30CD\u30B9\u30E1\u30FC\u30EB\u3068\u3057\u3066\u4E01\u5BE7\u306B\u6E05\u66F8\u3057\u3066\u304F\u3060\u3055\u3044\u3002\n\u5B9B\u5148: ${from}\n\u4EF6\u540D: ${subject}\n\n\u30E1\u30E2:\n${memo}\n\n\u6E05\u66F8\u3057\u305F\u30E1\u30FC\u30EB\u672C\u6587\u306E\u307F\u3092\u51FA\u529B\u3057\u3066\u304F\u3060\u3055\u3044\u3002`,
+      }],
+    });
+    const draft = msg.content[0]?.type === "text" ? msg.content[0].text : memo;
 
-  const pendingId = createPendingReply({
-    userId,
-    threadId,
-    toAddress: from,
-    subject: subject.startsWith("Re:") ? subject : `Re: ${subject}`,
-    draftContent: draft,
-  });
+    const pendingId = createPendingReply({
+      userId,
+      threadId,
+      toAddress: from,
+      subject: subject.startsWith("Re:") ? subject : `Re: ${subject}`,
+      draftContent: draft,
+    });
 
-  return c.redirect(`/reply?id=${pendingId}&token=${userId}`);
+    return c.redirect(`/reply?id=${pendingId}&token=${userId}`);
+  } catch (err) {
+    console.error("[dashboard] polish-reply error:", err);
+    return c.text("Internal Server Error", 500);
+  }
 });
 
 // ── GET /reply ──
 dashboard.get("/reply", (c) => {
   const userId = getToken(c);
   if (!userId) return c.text("token required", 401);
-  const id = Number(c.req.query("id"));
-  const pending = getPendingRepliesByStatus(userId, "pending").find((p) => p.id === id);
-  if (!pending) return c.text("not found", 404);
-  return c.html(buildReplyHtml(userId, pending));
+
+  try {
+    const id = Number(c.req.query("id"));
+    const pending = getPendingReply(id);
+    if (!pending || pending.userId !== userId) return c.text("not found", 404);
+    return c.html(buildReplyHtml(userId, pending));
+  } catch (err) {
+    console.error("[dashboard] GET /reply error:", err);
+    return c.text("Internal Server Error", 500);
+  }
 });
 
 // ── POST /reply/send ──
 dashboard.post("/reply/send", async (c) => {
   const userId = getToken(c);
   if (!userId) return c.text("token required", 401);
-  const body = await c.req.parseBody();
-  const id = Number(body["id"]);
-  const pending = getPendingRepliesByStatus(userId, "pending").find((p) => p.id === id);
-  if (!pending) return c.text("not found", 404);
 
-  await sendReply(userId, pending.threadId, pending.toAddress, pending.subject, pending.draftContent);
-  updatePendingReplyStatus(id, "sent");
+  try {
+    const body = await c.req.parseBody();
+    const id = Number(body["id"]);
+    const pending = getPendingReply(id);
+    if (!pending || pending.userId !== userId) return c.text("not found", 404);
 
-  return c.html(`<!DOCTYPE html><html><body style="font-family:sans-serif;text-align:center;padding:40px">
-    <p style="font-size:48px">\u2705</p>
-    <p style="font-size:20px">\u9001\u4FE1\u3057\u307E\u3057\u305F</p>
-    <a href="/dashboard?token=${userId}" style="color:#06C755">\u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9\u306B\u623B\u308B</a>
-  </body></html>`);
+    await sendReply(userId, pending.threadId, pending.toAddress, pending.subject, pending.draftContent);
+    updatePendingReplyStatus(id, "sent");
+
+    return c.html(`<!DOCTYPE html><html><body style="font-family:sans-serif;text-align:center;padding:40px">
+      <p style="font-size:48px">\u2705</p>
+      <p style="font-size:20px">\u9001\u4FE1\u3057\u307E\u3057\u305F</p>
+      <a href="/dashboard?token=${userId}" style="color:#06C755">\u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9\u306B\u623B\u308B</a>
+    </body></html>`);
+  } catch (err) {
+    console.error("[dashboard] reply/send error:", err);
+    return c.text("Internal Server Error", 500);
+  }
 });
 
 // ── POST /reply/skip ──
 dashboard.post("/reply/skip", async (c) => {
   const userId = getToken(c);
   if (!userId) return c.text("token required", 401);
-  const body = await c.req.parseBody();
-  const id = Number(body["id"]);
-  updatePendingReplyStatus(id, "cancelled");
-  return c.redirect(`/dashboard?token=${userId}`);
+
+  try {
+    const body = await c.req.parseBody();
+    const id = Number(body["id"]);
+    updatePendingReplyStatus(id, "cancelled");
+    return c.redirect(`/dashboard?token=${userId}`);
+  } catch (err) {
+    console.error("[dashboard] reply/skip error:", err);
+    return c.text("Internal Server Error", 500);
+  }
 });
 
 // ── HTML builders ──
@@ -149,7 +191,7 @@ function buildDashboardHtml(
   userId: string,
   unread: Email[],
   awaitingReply: (Email & { daysAgo: number })[],
-  pending: PendingReply[],
+  _pending: PendingReply[],
 ): string {
   const token = userId;
 
@@ -158,20 +200,20 @@ function buildDashboardHtml(
       <div style="font-weight:600;margin-bottom:4px">${esc(fmtFrom(e.from))}</div>
       <div style="color:#6b7280;font-size:14px;margin-bottom:12px">${esc(e.subject)}</div>
       <form method="POST" action="/dashboard/generate-reply?token=${token}" style="display:inline">
-        <input type="hidden" name="emailId" value="${e.id}">
+        <input type="hidden" name="emailId" value="${esc(e.id)}">
         <input type="hidden" name="from" value="${esc(e.from)}">
         <input type="hidden" name="subject" value="${esc(e.subject)}">
-        <input type="hidden" name="threadId" value="${e.threadId}">
+        <input type="hidden" name="threadId" value="${esc(e.threadId)}">
         <button type="submit" style="background:#06C755;color:white;border:none;border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;margin-right:8px">AI\u304C\u8FD4\u4FE1\u6848\u3092\u4F5C\u308B</button>
       </form>
-      <button onclick="showMemo('${e.id}')" style="background:#f3f4f6;color:#374151;border:none;border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;margin-right:8px">\u8981\u70B9\u3060\u3051\u4F1D\u3048\u3066AI\u304C\u6E05\u66F8</button>
+      <button onclick="showMemo('${esc(e.id)}')" style="background:#f3f4f6;color:#374151;border:none;border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;margin-right:8px">\u8981\u70B9\u3060\u3051\u4F1D\u3048\u3066AI\u304C\u6E05\u66F8</button>
       <a href="/dashboard?token=${token}" style="color:#9ca3af;font-size:13px">\u5F8C\u3067</a>
-      <div id="memo-${e.id}" style="display:none;margin-top:12px">
+      <div id="memo-${esc(e.id)}" style="display:none;margin-top:12px">
         <form method="POST" action="/dashboard/polish-reply?token=${token}">
-          <input type="hidden" name="emailId" value="${e.id}">
+          <input type="hidden" name="emailId" value="${esc(e.id)}">
           <input type="hidden" name="from" value="${esc(e.from)}">
           <input type="hidden" name="subject" value="${esc(e.subject)}">
-          <input type="hidden" name="threadId" value="${e.threadId}">
+          <input type="hidden" name="threadId" value="${esc(e.threadId)}">
           <p style="font-size:13px;color:#6b7280;margin-bottom:8px">\u4F1D\u3048\u305F\u3044\u3053\u3068\u3092\u7B87\u6761\u66F8\u304D\u3067\u66F8\u3044\u3066\u304F\u3060\u3055\u3044\u3002AI\u304C\u4E01\u5BE7\u306A\u30E1\u30FC\u30EB\u306B\u4ED5\u4E0A\u3052\u307E\u3059\u3002</p>
           <textarea name="memo" rows="4" style="width:100%;border:1px solid #e5e7eb;border-radius:8px;padding:8px;font-size:14px;box-sizing:border-box" placeholder="\u30FB\u6765\u9031\u706B\u66DC\u3067OK&#10;\u30FB\u5834\u6240\u306F\u6E0B\u8C37\u5E0C\u671B&#10;\u30FB15\u6642\u4EE5\u964D\u306A\u3089\u7A7A\u3044\u3066\u308B"></textarea>
           <button type="submit" style="background:#06C755;color:white;border:none;border-radius:8px;padding:8px 16px;font-size:13px;cursor:pointer;margin-top:8px">AI\u304C\u6E05\u66F8\u3057\u3066\u9001\u4FE1\u3059\u308B</button>
@@ -180,7 +222,7 @@ function buildDashboardHtml(
     </div>`).join("");
 
   const awaitingRows = awaitingReply.slice(0, 5).map((e) => {
-    const to = fmtFrom(e.to);
+    const to = fmtFrom(e.to ?? "");
     return `
     <div style="border:1px solid #e5e7eb;border-radius:12px;padding:16px;margin-bottom:12px">
       <div style="font-weight:600;margin-bottom:4px">${esc(to)}\u3055\u3093\u3078</div>
@@ -215,7 +257,7 @@ h2 { font-size:16px; font-weight:700; margin:24px 0 12px; color:#111; }
 <script>
 function showMemo(id) {
   var el = document.getElementById('memo-' + id);
-  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
 }
 </script>
 </body>

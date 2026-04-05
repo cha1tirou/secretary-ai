@@ -337,6 +337,24 @@ async function sendReplyWithClient(
   return res.data.id ?? "";
 }
 
+export async function checkThreadReplied(
+  threadId: string,
+  userId: string,
+  myEmails: string[],
+): Promise<boolean> {
+  try {
+    const thread = await getThread(threadId, userId);
+    // 自分以外からの返信があるか
+    const myAddrs = myEmails.map((e) => e.toLowerCase());
+    return thread.some((msg) => {
+      const from = msg.from.toLowerCase();
+      return !myAddrs.some((a) => from.includes(a));
+    });
+  } catch {
+    return true; // エラー時はreplied扱い（通知しない）
+  }
+}
+
 // ── 直接実行で動作確認 ──
 if (process.argv[1]?.endsWith("gmail.ts")) {
   const { initDb } = await import("../db/queries.js");

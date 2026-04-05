@@ -95,6 +95,59 @@ export async function getTodayEvents(userId: string): Promise<CalendarEvent[]> {
   }
 }
 
+async function getTomorrowEventsForAccount(
+  userId: string,
+  account?: GoogleAccount,
+): Promise<CalendarEvent[]> {
+  const calendar = await getCalendarClient(userId, account);
+
+  const now = new Date();
+  const startOfTomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  const endOfTomorrow = new Date(startOfTomorrow.getTime() + 24 * 60 * 60 * 1000);
+
+  const res = await calendar.events.list({
+    calendarId: "primary",
+    timeMin: startOfTomorrow.toISOString(),
+    timeMax: endOfTomorrow.toISOString(),
+    singleEvents: true,
+    orderBy: "startTime",
+  });
+
+  return (res.data.items ?? []).map(toCalendarEvent);
+}
+
+export async function getTomorrowEvents(userId: string): Promise<CalendarEvent[]> {
+  try {
+    const accounts = getGoogleAccountsByUserId(userId);
+
+    if (accounts.length === 0) {
+      return await getTomorrowEventsForAccount(userId);
+    }
+
+    const results = await Promise.allSettled(
+      accounts.map((acc) => getTomorrowEventsForAccount(userId, acc)),
+    );
+
+    const events: CalendarEvent[] = [];
+    const seenIds = new Set<string>();
+    for (const result of results) {
+      if (result.status === "fulfilled") {
+        for (const event of result.value) {
+          if (!seenIds.has(event.id)) {
+            seenIds.add(event.id);
+            events.push(event);
+          }
+        }
+      }
+    }
+
+    events.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+    return events;
+  } catch (err) {
+    wrapGoogleError(err, userId);
+  }
+}
+
 async function getWeekEventsForAccount(
   userId: string,
   account?: GoogleAccount,

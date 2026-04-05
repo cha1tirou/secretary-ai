@@ -66,12 +66,12 @@ function buildWelcomeMessages(authUrl: string): { batch1: any[]; batch2: any[] }
   // ── 2通目: pushFlex（Push詳細） ──
   const pushFlex = {
     type: "flex",
-    altText: "Push \u2014 \u5148\u56DE\u308A\u3057\u3066\u304A\u77E5\u3089\u305B\u3057\u307E\u3059",
+    altText: "\u81EA\u52D5\u304A\u77E5\u3089\u305B \u2014 \u5927\u4E8B\u306A\u3053\u3068\u3092\u5148\u56DE\u308A\u3057\u3066\u5C4A\u3051\u307E\u3059",
     contents: {
       type: "bubble", size: "giga",
       header: {
         type: "box", layout: "vertical", backgroundColor: "#2c3e50", paddingAll: "20px",
-        contents: [{ type: "text", text: "\uD83D\uDCE1 Push \u2014 \u5148\u56DE\u308A\u3057\u3066\u304A\u77E5\u3089\u305B\u3057\u307E\u3059", color: "#ffffff", weight: "bold", size: "md", wrap: true }],
+        contents: [{ type: "text", text: "\uD83D\uDD14 \u81EA\u52D5\u304A\u77E5\u3089\u305B \u2014 \u5927\u4E8B\u306A\u3053\u3068\u3092\u5148\u56DE\u308A\u3057\u3066\u5C4A\u3051\u307E\u3059", color: "#ffffff", weight: "bold", size: "md", wrap: true }],
       },
       body: {
         type: "box", layout: "vertical", paddingAll: "20px", spacing: "md",

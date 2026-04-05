@@ -1,16 +1,13 @@
 import cron from "node-cron";
 import { messagingApi } from "@line/bot-sdk";
-import { getUnreadEmails, getThread } from "../integrations/gmail.js";
+import { getUnreadEmails } from "../integrations/gmail.js";
 import { getTodayEvents } from "../integrations/gcal.js";
-import { generateReply } from "../agents/reply.js";
 import { classifyEmail, extractTasksFromEmail } from "../agents/classifier.js";
 import {
-  getDb,
   getAllUserIds,
   getGoogleAccountsByUserId,
   isEmailProcessed,
   markEmailProcessed,
-  createPendingReply,
   createTask,
   type EmailCategory,
 } from "../db/queries.js";
@@ -22,39 +19,8 @@ function getClient() {
   });
 }
 
-async function draftAndNotify(
-  client: messagingApi.MessagingApiClient,
-  email: Email,
-  userId: string,
-  label: string,
-): Promise<void> {
-  const thread = await getThread(email.threadId, userId);
-  const draft = await generateReply(thread, userId);
+// ── 5\u5206\u304A\u304D: \u65B0\u7740\u30E1\u30FC\u30EB\u5206\u985E + urgent\u5373\u901A\u77E5 + \u79FB\u52D5\u30EA\u30DE\u30A4\u30F3\u30C9 ──
 
-  createPendingReply({
-    userId,
-    threadId: email.threadId,
-    toAddress: email.from,
-    subject: email.subject,
-    draftContent: draft,
-  });
-
-  const from = (email.from.split("<")[0] ?? "").trim() || email.from;
-
-  await client.pushMessage({
-    to: userId,
-    messages: [
-      {
-        type: "text",
-        text: `${label}\n\nFrom: ${from}\n\u4EF6\u540D: ${email.subject}\n\n---\n${draft}\n\n\u2192 \u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9\u3067\u51E6\u7406\u3059\u308B\nhttps://web-production-b2798.up.railway.app/dashboard?token=${userId}`,
-      },
-    ],
-  });
-}
-
-// ── 5分おき: 新着メール分類 + urgent即通知 + 移動リマインド ──
-
-// 通知済みイベントIDを記録（重複防止）
 const notifiedEventIds = new Set<string>();
 
 async function checkNewEmailsForUser(client: messagingApi.MessagingApiClient, userId: string) {
@@ -67,10 +33,9 @@ async function checkNewEmailsForUser(client: messagingApi.MessagingApiClient, us
     console.log(`[auto-draft] ${userId}: ${newEmails.length}\u4EF6\u306E\u65B0\u7740\u30E1\u30FC\u30EB`);
 
     const accounts = getGoogleAccountsByUserId(userId);
-    const userEmails = accounts
-      .map((a) => a.email)
-      .filter((e): e is string => e !== null);
+    const userEmails = accounts.map((a) => a.email).filter((e): e is string => e !== null);
     const userEmail = userEmails[0];
+    const baseUrl = "https://web-production-b2798.up.railway.app";
 
     for (const email of newEmails.slice(0, 10)) {
       try {
@@ -79,7 +44,14 @@ async function checkNewEmailsForUser(client: messagingApi.MessagingApiClient, us
         console.log(`[auto-draft] ${email.subject} \u2192 ${category}`);
 
         if (category === "urgent_reply") {
-          await draftAndNotify(client, email, userId, "\u3010\u6025\u304E\u3011\u8FD4\u4FE1\u6848:");
+          const from = (email.from.split("<")[0] ?? "").trim() || email.from;
+          await client.pushMessage({
+            to: userId,
+            messages: [{
+              type: "text",
+              text: `\uD83D\uDD34 \u6025\u304E\u306E\u30E1\u30FC\u30EB\u304C\u5C4A\u3044\u3066\u3044\u307E\u3059\n\nFrom: ${from}\n\u4EF6\u540D: ${email.subject}\n\n\u2192 \u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9\u3067\u8FD4\u4FE1\u3059\u308B\n${baseUrl}/dashboard?token=${userId}`,
+            }],
+          });
         }
 
         if (category === "action_needed") {
@@ -122,7 +94,6 @@ async function checkMoveReminder(client: messagingApi.MessagingApiClient, userId
       const eventStart = new Date(e.start).getTime();
       const diff = eventStart - now;
 
-      // 開始1時間前 ±5分
       if (diff > oneHourMs - fiveMinMs && diff < oneHourMs + fiveMinMs) {
         const key = `${userId}:${e.id}`;
         if (notifiedEventIds.has(key)) continue;
@@ -159,7 +130,6 @@ async function checkNewEmails() {
 }
 
 export function startAutoDraft() {
-  // 5分おき: 新着分類 + urgent即通知 + 移動リマインド
   cron.schedule("*/5 * * * *", checkNewEmails);
   console.log("[auto-draft] \u30B9\u30B1\u30B8\u30E5\u30FC\u30EB\u767B\u9332\u5B8C\u4E86 (5\u5206\u304A\u304D\u5206\u985E)");
 }

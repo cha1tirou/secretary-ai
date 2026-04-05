@@ -8,8 +8,13 @@ import {
   getPendingReply,
   createPendingReply,
   updatePendingReplyStatus,
+  checkUsageLimit,
+  logUsage,
+  getResetDate,
+  USAGE_LIMITS,
 } from "../db/queries.js";
 import { buildAuthUrl } from "../integrations/auth.js";
+import { checkAndNotifyUsageAlert } from "../utils/usage.js";
 import type { Email, PendingReply, CalendarEvent } from "../types.js";
 
 const dashboard = new Hono();
@@ -127,7 +132,13 @@ dashboard.get("/dashboard", async (c) => {
       }
     }
 
-    return c.html(buildDashboardHtml(userId, unrepliedEmails, awaitingReply));
+    const userForPlan = getUser(userId);
+    const plan = userForPlan?.plan ?? "trial";
+    const replyUsage = checkUsageLimit(userId, plan, "ai_reply");
+    const convUsage = checkUsageLimit(userId, plan, "conversation");
+    const resetDate = getResetDate();
+
+    return c.html(buildDashboardHtml(userId, unrepliedEmails, awaitingReply, replyUsage, convUsage, resetDate));
   } catch (err) {
     console.error("[dashboard] GET /dashboard error:", err);
     return c.html(`<!DOCTYPE html><html><body style="font-family:sans-serif;text-align:center;padding:40px">
@@ -144,6 +155,19 @@ dashboard.post("/dashboard/generate-reply", async (c) => {
   if (!userId) return c.text("token required", 401);
 
   try {
+    const user = getUser(userId);
+    const plan = user?.plan ?? "trial";
+    const usageCheck = checkUsageLimit(userId, plan, "ai_reply");
+    if (!usageCheck.allowed) {
+      const resetDate = getResetDate();
+      return c.html(`<!DOCTYPE html><html><body style="font-family:sans-serif;text-align:center;padding:40px">
+        <p style="font-size:48px">\u26A0\uFE0F</p>
+        <p style="font-size:18px;margin-bottom:8px">\u4ECA\u6708\u306EAI\u8FD4\u4FE1\u751F\u6210\u306E\u4E0A\u9650\uFF08${usageCheck.limit}\u56DE\uFF09\u306B\u9054\u3057\u307E\u3057\u305F</p>
+        <p style="font-size:14px;color:#888;margin-bottom:24px">\u30EA\u30BB\u30C3\u30C8\u65E5\uFF1A${resetDate}</p>
+        <a href="/dashboard?token=${userId}" style="color:#06C755">\u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9\u306B\u623B\u308B</a>
+      </body></html>`);
+    }
+
     const body = await c.req.parseBody();
     const from = (body["from"] as string) ?? "";
     const subject = (body["subject"] as string) ?? "";
@@ -176,6 +200,9 @@ dashboard.post("/dashboard/generate-reply", async (c) => {
     });
     const draft = msg.content[0]?.type === "text" ? msg.content[0].text : "";
 
+    logUsage(userId, "ai_reply");
+    checkAndNotifyUsageAlert(userId, plan, "ai_reply").catch(() => {});
+
     const pendingId = createPendingReply({
       userId, threadId, toAddress: from,
       subject: subject.startsWith("Re:") ? subject : `Re: ${subject}`,
@@ -195,6 +222,19 @@ dashboard.post("/dashboard/generate-reminder", async (c) => {
   if (!userId) return c.text("token required", 401);
 
   try {
+    const user = getUser(userId);
+    const plan = user?.plan ?? "trial";
+    const usageCheck = checkUsageLimit(userId, plan, "ai_reply");
+    if (!usageCheck.allowed) {
+      const resetDate = getResetDate();
+      return c.html(`<!DOCTYPE html><html><body style="font-family:sans-serif;text-align:center;padding:40px">
+        <p style="font-size:48px">\u26A0\uFE0F</p>
+        <p style="font-size:18px;margin-bottom:8px">\u4ECA\u6708\u306EAI\u8FD4\u4FE1\u751F\u6210\u306E\u4E0A\u9650\uFF08${usageCheck.limit}\u56DE\uFF09\u306B\u9054\u3057\u307E\u3057\u305F</p>
+        <p style="font-size:14px;color:#888;margin-bottom:24px">\u30EA\u30BB\u30C3\u30C8\u65E5\uFF1A${resetDate}</p>
+        <a href="/dashboard?token=${userId}" style="color:#06C755">\u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9\u306B\u623B\u308B</a>
+      </body></html>`);
+    }
+
     const body = await c.req.parseBody();
     const to = (body["to"] as string) ?? "";
     const subject = (body["subject"] as string) ?? "";
@@ -212,6 +252,9 @@ dashboard.post("/dashboard/generate-reminder", async (c) => {
       }],
     });
     const draft = msg.content[0]?.type === "text" ? msg.content[0].text : "";
+
+    logUsage(userId, "ai_reply");
+    checkAndNotifyUsageAlert(userId, plan, "ai_reply").catch(() => {});
 
     const pendingId = createPendingReply({
       userId, threadId, toAddress: to,
@@ -325,8 +368,13 @@ function buildDashboardHtml(
   userId: string,
   unrepliedEmails: Email[],
   awaitingReply: AwaitingEmail[],
+  replyUsage: { remaining: number; limit: number },
+  convUsage: { remaining: number; limit: number },
+  resetDate: string,
 ): string {
   const token = userId;
+  const replyColor = replyUsage.remaining <= 5 ? "#ef4444" : "#6b7280";
+  const convColor = convUsage.remaining <= 10 ? "#ef4444" : "#6b7280";
 
   const unrepliedCards = unrepliedEmails.slice(0, 10).map((e) => `
     <div class="card">
@@ -401,6 +449,13 @@ body { font-family:-apple-system,sans-serif; background:#f9fafb; min-height:100v
 </head>
 <body>
 <div class="header">\uD83E\uDD16 AI\u79D8\u66F8 \u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9</div>
+<div style="background:white;border-bottom:1px solid #e5e7eb;padding:12px 20px;font-size:13px;display:flex;gap:16px;justify-content:center;flex-wrap:wrap">
+  <span style="color:${replyColor}">AI\u8FD4\u4FE1\uFF1A\u6B8B\u308A${replyUsage.remaining}\u56DE / ${replyUsage.limit}\u56DE</span>
+  <span style="color:#ddd">|</span>
+  <span style="color:${convColor}">AI\u5BFE\u8A71\uFF1A\u6B8B\u308A${convUsage.remaining}\u56DE / ${convUsage.limit}\u56DE</span>
+  <span style="color:#ddd">|</span>
+  <span style="color:#9ca3af">\u30EA\u30BB\u30C3\u30C8\uFF1A${resetDate}</span>
+</div>
 <div class="container">
   <div class="tabs">
     <div class="tab active" onclick="switchTab('reply')">\uD83D\uDCEC \u8981\u8FD4\u4FE1</div>

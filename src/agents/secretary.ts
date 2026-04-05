@@ -14,7 +14,12 @@ import {
   updateUserPlan,
   getTrialDaysRemaining,
   getGoogleAccountsByUserId,
+  checkUsageLimit,
+  logUsage,
+  getResetDate,
+  USAGE_LIMITS,
 } from "../db/queries.js";
+import { checkAndNotifyUsageAlert } from "../utils/usage.js";
 import { ReauthRequiredError, buildAuthUrl } from "../integrations/auth.js";
 import { GoogleApiError } from "../integrations/errors.js";
 import type { Plan } from "../types.js";
@@ -686,8 +691,8 @@ export async function handleWithSecretary(
       addConversation(userId, "user", userText, "light");
       addConversation(userId, "assistant", result);
     } else {
-      // trial / pro → 常にSonnet + Tool Use（コスト約1.5〜4.5円）
-      result = await proAgentLoop(userId, userText);
+      // trial / pro \u2192 \u5E38\u306BSonnet + Tool Use
+      result = await proAgentLoop(userId, userText, plan);
     }
   } catch (err) {
     console.error(`[secretary] handleWithSecretary error (${userId}):`, err);
@@ -704,14 +709,22 @@ export async function handleWithSecretary(
 
 // ── Pro Agent Loop (Sonnet + Tool Use) ──
 
-async function proAgentLoop(userId: string, userText: string): Promise<string> {
+async function proAgentLoop(userId: string, userText: string, plan: string): Promise<string> {
   console.log(`[secretary] agentic mode: "${userText}"`);
 
   if (!process.env["ANTHROPIC_API_KEY"]) {
     addConversation(userId, "user", userText, "agentic_no_key");
-    const fallback = "ANTHROPIC_API_KEYが未設定のため、複雑なリクエストは処理できません。.envにAPIキーを設定してください。";
+    const fallback = "ANTHROPIC_API_KEY\u304C\u672A\u8A2D\u5B9A\u306E\u305F\u3081\u3001\u8907\u96D1\u306A\u30EA\u30AF\u30A8\u30B9\u30C8\u306F\u51E6\u7406\u3067\u304D\u307E\u305B\u3093\u3002.env\u306BAPI\u30AD\u30FC\u3092\u8A2D\u5B9A\u3057\u3066\u304F\u3060\u3055\u3044\u3002";
     addConversation(userId, "assistant", fallback);
     return fallback;
+  }
+
+  // 使用量チェック
+  const usageCheck = checkUsageLimit(userId, plan, "conversation");
+  if (!usageCheck.allowed) {
+    const resetDate = getResetDate();
+    const limit = USAGE_LIMITS[plan]?.["conversation"] ?? 0;
+    return `\u4ECA\u6708\u306EAI\u5BFE\u8A71\u56DE\u6570\u306E\u4E0A\u9650\uFF08${limit}\u56DE\uFF09\u306B\u9054\u3057\u307E\u3057\u305F\u3002\n\n\u30EA\u30BB\u30C3\u30C8\u65E5\uFF1A${resetDate}\n\n\u30D7\u30ED\u30D7\u30E9\u30F3\u306B\u30A2\u30C3\u30D7\u30B0\u30EC\u30FC\u30C9\u3059\u308B\u3068300\u56DE/\u6708\u3054\u5229\u7528\u3044\u305F\u3060\u3051\u307E\u3059\u3002\n\uFF08\u6C7A\u6E08\u6A5F\u80FD\u306F\u8FD1\u65E5\u516C\u958B\u4E88\u5B9A\u3067\u3059\uFF09`;
   }
 
   // 会話履歴を取得
@@ -738,8 +751,10 @@ async function proAgentLoop(userId: string, userText: string): Promise<string> {
     // テキストのみの場合 → 完了
     if (response.stop_reason === "end_turn") {
       const textBlock = response.content.find((b) => b.type === "text");
-      const reply = textBlock && "text" in textBlock ? textBlock.text : "すみません、うまく処理できませんでした。";
+      const reply = textBlock && "text" in textBlock ? textBlock.text : "\u3059\u307F\u307E\u305B\u3093\u3001\u3046\u307E\u304F\u51E6\u7406\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F\u3002";
       addConversation(userId, "assistant", reply);
+      logUsage(userId, "conversation");
+      checkAndNotifyUsageAlert(userId, plan, "conversation").catch(() => {});
       return reply;
     }
 
@@ -788,12 +803,16 @@ async function proAgentLoop(userId: string, userText: string): Promise<string> {
 
     // それ以外 → テキスト抽出して返す
     const textBlock = response.content.find((b) => b.type === "text");
-    const reply = textBlock && "text" in textBlock ? textBlock.text : "処理が完了しました。";
+    const reply = textBlock && "text" in textBlock ? textBlock.text : "\u51E6\u7406\u304C\u5B8C\u4E86\u3057\u307E\u3057\u305F\u3002";
     addConversation(userId, "assistant", reply);
+    logUsage(userId, "conversation");
+    checkAndNotifyUsageAlert(userId, plan, "conversation").catch(() => {});
     return reply;
   }
 
-  const fallback = "処理が複雑すぎるため、もう少し具体的にお願いします。";
+  const fallback = "\u51E6\u7406\u304C\u8907\u96D1\u3059\u304E\u308B\u305F\u3081\u3001\u3082\u3046\u5C11\u3057\u5177\u4F53\u7684\u306B\u304A\u9858\u3044\u3057\u307E\u3059\u3002";
   addConversation(userId, "assistant", fallback);
+  logUsage(userId, "conversation");
+  checkAndNotifyUsageAlert(userId, plan, "conversation").catch(() => {});
   return fallback;
 }

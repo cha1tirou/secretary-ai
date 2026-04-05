@@ -369,6 +369,47 @@ export function deleteTask(id: number): void {
     .run(id);
 }
 
+// ── Usage Logs ──
+
+export function getMonthlyUsage(userId: string, actionType: string): number {
+  const monthStart = new Date();
+  monthStart.setDate(1);
+  monthStart.setHours(0, 0, 0, 0);
+  const row = getDb().prepare(`
+    SELECT COUNT(*) as count FROM usage_logs
+    WHERE user_id = ? AND action_type = ? AND created_at >= ?
+  `).get(userId, actionType, monthStart.toISOString()) as { count: number };
+  return row.count;
+}
+
+export function logUsage(userId: string, actionType: string): void {
+  getDb().prepare("INSERT INTO usage_logs (user_id, action_type) VALUES (?, ?)").run(userId, actionType);
+}
+
+export const USAGE_LIMITS: Record<string, Record<string, number>> = {
+  trial:   { ai_reply: 10,  conversation: 20 },
+  light:   { ai_reply: 30,  conversation: 60 },
+  pro:     { ai_reply: 150, conversation: 300 },
+  expired: { ai_reply: 0,   conversation: 0 },
+};
+
+export function checkUsageLimit(
+  userId: string,
+  plan: string,
+  actionType: string,
+): { allowed: boolean; used: number; limit: number; remaining: number } {
+  const limit = USAGE_LIMITS[plan]?.[actionType] ?? 0;
+  const used = getMonthlyUsage(userId, actionType);
+  const remaining = Math.max(0, limit - used);
+  return { allowed: remaining > 0, used, limit, remaining };
+}
+
+export function getResetDate(): string {
+  const d = new Date();
+  d.setMonth(d.getMonth() + 1, 1);
+  return `${d.getMonth() + 1}\u67081\u65E5`;
+}
+
 // ── 直接実行でDB初期化 ──
 
 if (process.argv[1] && resolve(process.argv[1]) === resolve(__dirname, "queries.ts")) {

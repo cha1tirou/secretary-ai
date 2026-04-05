@@ -61,6 +61,16 @@ CREATE TABLE IF NOT EXISTS google_accounts (
   UNIQUE(user_id, label)                         -- [PG] そのままOK
 );
 
+CREATE TABLE IF NOT EXISTS usage_logs (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT, -- [PG] SERIAL PRIMARY KEY
+  user_id     TEXT NOT NULL,
+  action_type TEXT NOT NULL,
+  created_at  TEXT DEFAULT (datetime('now','localtime'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_usage_logs_user_month
+  ON usage_logs (user_id, action_type, created_at);
+
 CREATE TABLE IF NOT EXISTS pending_replies (
   id               INTEGER PRIMARY KEY AUTOINCREMENT, -- [PG] SERIAL PRIMARY KEY
   user_id          TEXT NOT NULL,

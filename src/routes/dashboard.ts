@@ -111,6 +111,8 @@ dashboard.get("/dashboard", async (c) => {
     const sent = await getSentEmails(userId, 30).catch(() => [] as Email[]);
     const awaitingReply: AwaitingEmail[] = [];
 
+    const SKIP_TO_PATTERNS = /no-?reply|noreply|unsubscribe|newsletter|notifications?|donotreply/i;
+
     if (myEmails.length > 0) {
       for (const email of sent) {
         const sentDate = new Date(email.date).getTime();
@@ -120,9 +122,14 @@ dashboard.get("/dashboard", async (c) => {
         if (awaitingReply.length >= 5) break;
 
         const toAddresses = email.to.split(/[,;]/).map((a) => a.trim()).filter(Boolean);
-        const recipientAddress = toAddresses.find((a) =>
+        const otherRecipients = toAddresses.filter((a) =>
           !myEmails.some((me) => a.toLowerCase().includes(me.toLowerCase()))
-        ) ?? email.to;
+        );
+        if (otherRecipients.length === 0) continue;
+
+        const recipientAddress = otherRecipients[0] ?? email.to;
+        if (SKIP_TO_PATTERNS.test(recipientAddress)) continue;
+
         const recipientName = fmtFrom(recipientAddress);
 
         const replied = await checkThreadReplied(email.threadId, userId, myEmails).catch(() => true);
@@ -431,8 +438,6 @@ body { font-family:-apple-system,sans-serif; background:#f9fafb; min-height:100v
 .tabs { display:flex; border-bottom:2px solid #e5e7eb; margin-bottom:16px; }
 .tab { flex:1; text-align:center; padding:12px; font-size:14px; font-weight:600; cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-2px; color:#9ca3af; }
 .tab.active { color:#06C755; border-bottom-color:#06C755; }
-.tab-content { display:none; }
-.tab-content.active { display:block; }
 .card { border:1px solid #e5e7eb; border-radius:12px; padding:16px; margin-bottom:12px; }
 .card-from { font-weight:600; margin-bottom:4px; }
 .card-subject { color:#6b7280; font-size:14px; margin-bottom:4px; }
@@ -461,10 +466,10 @@ body { font-family:-apple-system,sans-serif; background:#f9fafb; min-height:100v
     <div class="tab active" onclick="switchTab('reply')">\uD83D\uDCEC \u8981\u8FD4\u4FE1</div>
     <div class="tab" onclick="switchTab('awaiting')">\u23F3 \u8FD4\u4FE1\u5F85\u3061</div>
   </div>
-  <div id="tab-reply" class="tab-content active">
+  <div id="tab-reply" style="display:block">
     ${unrepliedCards || '<p class="empty">\u8981\u8FD4\u4FE1\u306E\u30E1\u30FC\u30EB\u306F\u3042\u308A\u307E\u305B\u3093</p>'}
   </div>
-  <div id="tab-awaiting" class="tab-content">
+  <div id="tab-awaiting" style="display:none">
     ${awaitingCards || '<p class="empty">\u8FD4\u4FE1\u5F85\u3061\u306E\u30E1\u30FC\u30EB\u306F\u3042\u308A\u307E\u305B\u3093</p>'}
   </div>
 </div>
@@ -473,8 +478,8 @@ function switchTab(name) {
   document.querySelectorAll('.tab').forEach(function(t, i) {
     t.classList.toggle('active', (name === 'reply' && i === 0) || (name === 'awaiting' && i === 1));
   });
-  document.getElementById('tab-reply').classList.toggle('active', name === 'reply');
-  document.getElementById('tab-awaiting').classList.toggle('active', name === 'awaiting');
+  document.getElementById('tab-reply').style.display = name === 'reply' ? 'block' : 'none';
+  document.getElementById('tab-awaiting').style.display = name === 'awaiting' ? 'block' : 'none';
 }
 function showMemo(id) {
   var el = document.getElementById('memo-' + id);

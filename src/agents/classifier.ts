@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { Email } from "../types.js";
-import type { EmailCategory } from "../db/queries.js";
+import { getCachedEmailCategory, setCachedEmailCategory, type EmailCategory } from "../db/queries.js";
 
 const isDev = process.env["NODE_ENV"] === "development";
 
@@ -277,6 +277,21 @@ export async function classifyEmail(email: Email, userEmail?: string): Promise<E
     console.error("[classifier] メール分類LLMエラー:", err);
     return classifyPersonalByRegex(email);
   }
+}
+
+// ── キャッシュ付きメール分類 ──
+
+export async function classifyEmailWithCache(
+  email: Email,
+  userId: string,
+  userEmail?: string,
+): Promise<EmailCategory> {
+  const cached = getCachedEmailCategory(email.id, userId);
+  if (cached) return cached as EmailCategory;
+
+  const category = await classifyEmail(email, userEmail);
+  setCachedEmailCategory(email.id, userId, category);
+  return category;
 }
 
 // ── メールからタスク抽出 ──

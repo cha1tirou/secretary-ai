@@ -1,8 +1,9 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { getTodayEvents, getTomorrowEvents } from "../integrations/gcal.js";
-import { getUnreadEmails, getSentEmails, checkThreadReplied } from "../integrations/gmail.js";
+import { getRecentEmails, getSentEmails, checkThreadReplied } from "../integrations/gmail.js";
 import { getWeatherSummary, getTomorrowWeatherSummary } from "../integrations/weather.js";
-import { getDb, getGoogleAccountsByUserId, countProcessedEmailsByCategory, getProcessedEmailsByCategory } from "../db/queries.js";
+import { classifyEmailWithCache } from "./classifier.js";
+import { getGoogleAccountsByUserId } from "../db/queries.js";
 import type { CalendarEvent, Email } from "../types.js";
 
 const isDev = process.env["NODE_ENV"] === "development";
@@ -18,24 +19,17 @@ function fmtFrom(from: string): string {
   return (from.split("<")[0] ?? "").trim() || from;
 }
 
-function getUnrepliedMessageIds(userId: string): string[] {
-  const rows = getDb().prepare(`
-    SELECT pe.message_id FROM processed_emails pe
-    WHERE pe.user_id = ?
-      AND pe.category IN ('urgent_reply', 'reply_later')
-  `).all(userId) as { message_id: string }[];
-  return rows.map((r) => r.message_id);
-}
+type NeedsReplyEmail = { from: string; subject: string; daysAgo: number };
+type AwaitingReplyEmail = { to: string; subject: string; daysAgo: number };
 
 // ── Types ──
 
 type MorningContext = {
   weather: string;
   events: CalendarEvent[];
-  emails: Email[];
-  unrepliedSent: { from: string; subject: string; daysAgo: number }[];
-  actionNeededSubjects: string[];
-  newsletterCount: number;
+  unreadCount: number;
+  needsReplyEmails: NeedsReplyEmail[];
+  awaitingReplyEmails: AwaitingReplyEmail[];
 };
 
 // ── Morning Briefing (8:00, Haiku) ──
@@ -44,41 +38,48 @@ async function buildMorningContext(userId: string): Promise<MorningContext> {
   const accounts = getGoogleAccountsByUserId(userId);
   const myEmails = accounts.map((a) => a.email).filter((e): e is string => e !== null);
 
-  const [weather, events, emails, sentEmails] = await Promise.all([
+  const [weather, events, recentEmails, sentEmails] = await Promise.all([
     getWeatherSummary().catch(() => ""),
     getTodayEvents(userId).catch(() => [] as CalendarEvent[]),
-    getUnreadEmails(userId).catch(() => [] as Email[]),
+    getRecentEmails(userId, 14).catch(() => [] as Email[]),
     getSentEmails(userId, 20).catch(() => [] as Email[]),
   ]);
 
-  // 未返信メール検出（3日以上）
-  const unrepliedSent: MorningContext["unrepliedSent"] = [];
-  const threeDaysAgo = Date.now() - 3 * 86400000;
-  for (const sent of sentEmails) {
-    const sentDate = new Date(sent.date).getTime();
-    if (sentDate > threeDaysAgo) continue;
-    const replied = await checkThreadReplied(sent.threadId, userId, myEmails).catch(() => true);
-    if (!replied) {
-      const daysAgo = Math.floor((Date.now() - sentDate) / 86400000);
-      unrepliedSent.push({ from: fmtFrom(sent.to), subject: sent.subject, daysAgo });
-    }
-    if (unrepliedSent.length >= 5) break;
+  const unreadCount = recentEmails.filter((e) => e.isUnread).length;
+
+  // 要返信メール（キャッシュ付き分類）
+  const needsReplyEmails: NeedsReplyEmail[] = [];
+  for (const email of recentEmails) {
+    if (needsReplyEmails.length >= 3) break;
+    if (!email.subject || email.subject.trim() === "") continue;
+    const category = await classifyEmailWithCache(email, userId, myEmails[0]).catch(() => "fyi" as const);
+    if (category !== "reply_later" && category !== "urgent_reply") continue;
+    const replied = await checkThreadReplied(email.threadId, userId, myEmails).catch(() => true);
+    if (replied) continue;
+    const daysAgo = Math.floor((Date.now() - new Date(email.date).getTime()) / 86400000);
+    needsReplyEmails.push({ from: fmtFrom(email.from), subject: email.subject, daysAgo });
   }
 
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-  const since = todayStart.toISOString();
-
-  const actionRows = getProcessedEmailsByCategory(userId, "action_needed", since);
-  const actionNeededSubjects: string[] = [];
-  for (const row of actionRows) {
-    const match = emails.find((e) => e.id === row.messageId);
-    if (match) actionNeededSubjects.push(match.subject);
+  // 返信待ちメール（3日以上・最大2件）
+  const awaitingReplyEmails: AwaitingReplyEmail[] = [];
+  const SKIP_RE = /no-?reply|noreply|unsubscribe|marketing|newsletter/i;
+  for (const email of sentEmails) {
+    if (awaitingReplyEmails.length >= 2) break;
+    const sentDate = new Date(email.date).getTime();
+    if (isNaN(sentDate)) continue;
+    const daysAgo = Math.floor((Date.now() - sentDate) / 86400000);
+    if (daysAgo < 3 || daysAgo > 90) continue;
+    if (!email.subject || email.subject.trim() === "") continue;
+    const toAddr = email.to.split(/[,;]/).map((a) => a.trim()).find((a) =>
+      !myEmails.some((me) => a.toLowerCase().includes(me.toLowerCase()))
+    );
+    if (!toAddr || SKIP_RE.test(toAddr)) continue;
+    const replied = await checkThreadReplied(email.threadId, userId, myEmails).catch(() => true);
+    if (replied) continue;
+    awaitingReplyEmails.push({ to: fmtFrom(toAddr), subject: email.subject, daysAgo });
   }
 
-  const newsletterCount = countProcessedEmailsByCategory(userId, "newsletter", since);
-
-  return { weather, events, emails, unrepliedSent, actionNeededSubjects, newsletterCount };
+  return { weather, events, unreadCount, needsReplyEmails, awaitingReplyEmails };
 }
 
 function buildMorningPrompt(ctx: MorningContext): string {
@@ -90,19 +91,19 @@ function buildMorningPrompt(ctx: MorningContext): string {
       }).join("\n");
 
   const concerns: string[] = [];
-  for (const s of ctx.actionNeededSubjects) concerns.push(`\u26A0\uFE0F ${s}`);
-  for (const u of ctx.unrepliedSent) concerns.push(`\u26A0\uFE0F ${u.from}\u300C${u.subject}\u300D\u2190 ${u.daysAgo}\u65E5\u8FD4\u4FE1\u306A\u3057`);
-
-  const emailSection = ctx.emails.length === 0
-    ? "\u672A\u8AAD\u30E1\u30FC\u30EB\u306F\u3042\u308A\u307E\u305B\u3093\u3002"
-    : ctx.emails.slice(0, 5).map((e) => `- ${fmtFrom(e.from)}: ${e.subject}`).join("\n");
+  for (const e of ctx.needsReplyEmails) {
+    const dayStr = e.daysAgo === 0 ? "\u4ECA\u65E5" : e.daysAgo === 1 ? "\u6628\u65E5" : `${e.daysAgo}\u65E5\u524D`;
+    concerns.push(`\u26A0\uFE0F ${e.from}\u3055\u3093\u304B\u3089\u300C${e.subject}\u300D\uFF08${dayStr}\u53D7\u4FE1\uFF09\u2192 \u307E\u3060\u8FD4\u4FE1\u3067\u304D\u3066\u3044\u307E\u305B\u3093`);
+  }
+  for (const e of ctx.awaitingReplyEmails) {
+    concerns.push(`\u26A0\uFE0F ${e.to}\u3055\u3093\u3078\u306E\u300C${e.subject}\u300D\u2192 ${e.daysAgo}\u65E5\u7D4C\u904E\u3001\u8FD4\u4FE1\u304C\u6765\u3066\u3044\u307E\u305B\u3093`);
+  }
 
   return `\u3042\u306A\u305F\u306FLINE\u3067\u52D5\u304FAI\u79D8\u66F8\u3067\u3059\u3002\u4EE5\u4E0B\u306E\u60C5\u5831\u3092\u3082\u3068\u306B\u3001\u671D\u306E\u30D6\u30EA\u30FC\u30D5\u30A3\u30F3\u30B0\u3092\u4F5C\u6210\u3057\u3066\u304F\u3060\u3055\u3044\u3002
 
 ## \u30EB\u30FC\u30EB
 - LINE\u3067\u8AAD\u307F\u3084\u3059\u3044\u7C21\u6F54\u306A\u5F62\u5F0F
 - 1000\u6587\u5B57\u4EE5\u5185
-- \u4EE5\u4E0B\u306E\u5F62\u5F0F\u3092\u53C2\u8003\u306B\u3059\u308B
 
 ## \u5929\u6C17
 ${ctx.weather || "\u60C5\u5831\u306A\u3057"}
@@ -113,15 +114,13 @@ ${eventSection}
 ## \u6C17\u306B\u306A\u308B\u3053\u3068
 ${concerns.length === 0 ? "\u306A\u3057" : concerns.join("\n")}
 
-## \u672A\u8AAD\u30E1\u30FC\u30EB (${ctx.emails.length}\u4EF6)
-${emailSection}`;
+## \u672A\u8AAD\u30E1\u30FC\u30EB
+${ctx.unreadCount}\u4EF6`;
 }
 
 function buildMorningMock(ctx: MorningContext): string {
   const date = new Date().toLocaleDateString("ja-JP", { month: "long", day: "numeric", weekday: "short" });
-
   let text = `\u304A\u306F\u3088\u3046\u3054\u3056\u3044\u307E\u3059\u3002${date}\u3067\u3059\u3002\n`;
-
   if (ctx.weather) text += `\n${ctx.weather}\n`;
 
   text += `\n\u2501\u2501 \u4ECA\u65E5\u306E\u4E88\u5B9A \u2501\u2501\n`;
@@ -135,24 +134,22 @@ function buildMorningMock(ctx: MorningContext): string {
     }
   }
 
-  // 気になること
   const concerns: string[] = [];
-  for (const s of ctx.actionNeededSubjects) concerns.push(`\u26A0\uFE0F ${s}`);
-  for (const u of ctx.unrepliedSent) concerns.push(`\u26A0\uFE0F ${u.from}\u300C${u.subject}\u300D\u2190 ${u.daysAgo}\u65E5\u7D4C\u904E`);
+  for (const e of ctx.needsReplyEmails) {
+    const dayStr = e.daysAgo === 0 ? "\u4ECA\u65E5" : e.daysAgo === 1 ? "\u6628\u65E5" : `${e.daysAgo}\u65E5\u524D`;
+    concerns.push(`\u26A0\uFE0F ${e.from}\u3055\u3093\u300C${e.subject}\u300D\uFF08${dayStr}\uFF09\u2192 \u672A\u8FD4\u4FE1`);
+  }
+  for (const e of ctx.awaitingReplyEmails) {
+    concerns.push(`\u26A0\uFE0F ${e.to}\u3055\u3093\u3078\u300C${e.subject}\u300D\u2190 ${e.daysAgo}\u65E5\u7D4C\u904E`);
+  }
   if (concerns.length > 0) {
     text += `\n\u2501\u2501 \u6C17\u306B\u306A\u308B\u3053\u3068 \u2501\u2501\n`;
     text += concerns.join("\n") + "\n";
   }
 
-  text += `\n\u2501\u2501 \u672A\u8AAD\u30E1\u30FC\u30EB \u2501\u2501\n`;
-  if (ctx.emails.length === 0) {
-    text += "\u672A\u8AAD\u30E1\u30FC\u30EB\u306F\u3042\u308A\u307E\u305B\u3093\u3002\n";
-  } else {
-    text += `${ctx.emails.length}\u4EF6\u306E\u672A\u8AAD\u30E1\u30FC\u30EB\u304C\u3042\u308A\u307E\u3059\u3002\n`;
-    for (const e of ctx.emails.slice(0, 5)) {
-      text += `\u30FB${fmtFrom(e.from)}: ${e.subject}\n`;
-    }
-    if (ctx.emails.length > 5) text += `\u2026\u4ED6${ctx.emails.length - 5}\u4EF6\n`;
+  if (ctx.unreadCount > 0) {
+    text += `\n\u2501\u2501 \u672A\u8AAD\u30E1\u30FC\u30EB \u2501\u2501\n`;
+    text += `${ctx.unreadCount}\u4EF6\u306E\u672A\u8AAD\u30E1\u30FC\u30EB\u304C\u3042\u308A\u307E\u3059\u3002\n`;
   }
 
   return text.trim();
@@ -185,6 +182,9 @@ export async function generateBriefing(userId: string): Promise<string> {
 
 export async function generateNoonBriefing(userId: string): Promise<string> {
   try {
+    const accounts = getGoogleAccountsByUserId(userId);
+    const myEmails = accounts.map((a) => a.email).filter((e): e is string => e !== null);
+
     const events = await getTodayEvents(userId).catch(() => [] as CalendarEvent[]);
     const afternoonEvents = events.filter((e) => {
       if (!e.start.includes("T")) return false;
@@ -193,7 +193,6 @@ export async function generateNoonBriefing(userId: string): Promise<string> {
 
     let text = "\u5348\u5F8C\u306E\u4E88\u5B9A\u3067\u3059\u3002\n";
     text += "\n\u2501\u2501 \u5348\u5F8C\u306E\u30B9\u30B1\u30B8\u30E5\u30FC\u30EB \u2501\u2501\n";
-
     if (afternoonEvents.length === 0) {
       text += "\u5348\u5F8C\u306E\u4E88\u5B9A\u306F\u3042\u308A\u307E\u305B\u3093\u3002\n";
     } else {
@@ -204,22 +203,23 @@ export async function generateNoonBriefing(userId: string): Promise<string> {
       }
     }
 
-    const unrepliedIds = getUnrepliedMessageIds(userId);
-    if (unrepliedIds.length > 0) {
+    // 要返信メール（キャッシュ付き分類）
+    const recentEmails = await getRecentEmails(userId, 14).catch(() => [] as Email[]);
+    let needsReplyCount = 0;
+    for (const email of recentEmails.slice(0, 20)) {
+      if (!email.subject || email.subject.trim() === "") continue;
+      const cat = await classifyEmailWithCache(email, userId, myEmails[0]).catch(() => "fyi" as const);
+      if (cat !== "reply_later" && cat !== "urgent_reply") continue;
+      const replied = await checkThreadReplied(email.threadId, userId, myEmails).catch(() => true);
+      if (!replied) needsReplyCount++;
+    }
+
+    if (needsReplyCount > 0) {
       text += `\n\u2501\u2501 \u6C17\u306B\u306A\u308B\u3053\u3068 \u2501\u2501\n`;
-      text += `\u30FB\u672A\u5BFE\u5FDC\u30E1\u30FC\u30EB\u304C${unrepliedIds.length}\u4EF6\u3042\u308A\u307E\u3059\n`;
-      // 件名を最大3件表示
-      const unread = await getUnreadEmails(userId).catch(() => [] as Email[]);
-      const matched = unrepliedIds.slice(0, 3)
-        .map((id) => unread.find((e) => e.id === id))
-        .filter((e): e is Email => e !== undefined);
-      for (const e of matched) {
-        text += `  \u30FB${fmtFrom(e.from)}: ${e.subject}\n`;
-      }
+      text += `\u30FB\u672A\u8FD4\u4FE1\u30E1\u30FC\u30EB\u304C${needsReplyCount}\u4EF6\u3042\u308A\u307E\u3059\n`;
     }
 
     text += `\n\u2192 \u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9\u3067\u78BA\u8A8D\nhttps://web-production-b2798.up.railway.app/dashboard?token=${userId}`;
-
     return text.trim();
   } catch (err) {
     console.error("[briefing] noon error:", err);
@@ -231,18 +231,29 @@ export async function generateNoonBriefing(userId: string): Promise<string> {
 
 export async function generateEveningBriefing(userId: string): Promise<string> {
   try {
-    const [tomorrowEvents, tomorrowWeather] = await Promise.all([
+    const accounts = getGoogleAccountsByUserId(userId);
+    const myEmails = accounts.map((a) => a.email).filter((e): e is string => e !== null);
+
+    const [tomorrowEvents, tomorrowWeather, recentEmails] = await Promise.all([
       getTomorrowEvents(userId).catch(() => [] as CalendarEvent[]),
       getTomorrowWeatherSummary().catch(() => ""),
+      getRecentEmails(userId, 14).catch(() => [] as Email[]),
     ]);
 
-    const unrepliedIds = getUnrepliedMessageIds(userId);
+    let needsReplyCount = 0;
+    for (const email of recentEmails.slice(0, 20)) {
+      if (!email.subject || email.subject.trim() === "") continue;
+      const cat = await classifyEmailWithCache(email, userId, myEmails[0]).catch(() => "fyi" as const);
+      if (cat !== "reply_later" && cat !== "urgent_reply") continue;
+      const replied = await checkThreadReplied(email.threadId, userId, myEmails).catch(() => true);
+      if (!replied) needsReplyCount++;
+    }
 
     let text = "\u304A\u75B2\u308C\u3055\u307E\u3067\u3057\u305F\u3002\n";
 
-    if (unrepliedIds.length > 0) {
+    if (needsReplyCount > 0) {
       text += `\n\u2501\u2501 \u4ECA\u65E5\u306E\u7A4D\u307F\u6B8B\u3057 \u2501\u2501\n`;
-      text += `\u30FB\u672A\u5BFE\u5FDC\u30E1\u30FC\u30EB\u304C${unrepliedIds.length}\u4EF6\u3042\u308A\u307E\u3059\n`;
+      text += `\u30FB\u672A\u8FD4\u4FE1\u30E1\u30FC\u30EB\u304C${needsReplyCount}\u4EF6\u3042\u308A\u307E\u3059\n`;
     }
 
     text += `\n\u2501\u2501 \u660E\u65E5\u306E\u4E88\u5B9A \u2501\u2501\n`;
@@ -258,7 +269,7 @@ export async function generateEveningBriefing(userId: string): Promise<string> {
 
     if (tomorrowWeather) text += `\n${tomorrowWeather}\n`;
 
-    if (unrepliedIds.length > 0) {
+    if (needsReplyCount > 0) {
       text += `\n\u2192 \u7A4D\u307F\u6B8B\u3057\u306F\u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9\u304B\u3089\nhttps://web-production-b2798.up.railway.app/dashboard?token=${userId}\n`;
     }
 

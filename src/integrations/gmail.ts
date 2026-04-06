@@ -233,6 +233,70 @@ export async function getAllEmails(userId: string, maxResults = 50): Promise<Ema
   }
 }
 
+async function getRecentEmailsForAccount(
+  userId: string,
+  daysBack: number,
+  account?: GoogleAccount,
+): Promise<Email[]> {
+  const gmail = await getGmailClient(userId, account);
+  const list = await gmail.users.messages.list({
+    userId: "me",
+    q: `in:inbox newer_than:${daysBack}d`,
+    maxResults: 30,
+  });
+  const messageIds = list.data.messages ?? [];
+  if (messageIds.length === 0) return [];
+  const emails: Email[] = [];
+  for (const { id, threadId } of messageIds) {
+    if (!id) continue;
+    const msg = await gmail.users.messages.get({ userId: "me", id, format: "full" });
+    const headers = msg.data.payload?.headers ?? [];
+    const body = extractBody(msg.data.payload);
+    const labelIds = msg.data.labelIds ?? [];
+    emails.push({
+      id: msg.data.id ?? "",
+      threadId: threadId ?? "",
+      from: extractHeader(headers, "From"),
+      to: extractHeader(headers, "To"),
+      cc: extractHeader(headers, "Cc"),
+      subject: extractHeader(headers, "Subject"),
+      body: body.slice(0, 500),
+      date: extractHeader(headers, "Date"),
+      isUnread: labelIds.includes("UNREAD"),
+      listUnsubscribe: extractHeader(headers, "List-Unsubscribe"),
+      listId: extractHeader(headers, "List-Id"),
+      precedence: extractHeader(headers, "Precedence"),
+    });
+  }
+  return emails;
+}
+
+export async function getRecentEmails(userId: string, daysBack = 14): Promise<Email[]> {
+  try {
+    const accounts = getGoogleAccountsByUserId(userId);
+    if (accounts.length === 0) {
+      return await getRecentEmailsForAccount(userId, daysBack);
+    }
+    const results = await Promise.allSettled(
+      accounts.map((acc) => getRecentEmailsForAccount(userId, daysBack, acc)),
+    );
+    const emails: Email[] = [];
+    const seenIds = new Set<string>();
+    let lastError: unknown = null;
+    for (const result of results) {
+      if (result.status === "fulfilled") {
+        for (const email of result.value) {
+          if (!seenIds.has(email.id)) { seenIds.add(email.id); emails.push(email); }
+        }
+      } else { lastError = result.reason; }
+    }
+    if (emails.length === 0 && lastError) wrapGoogleError(lastError, userId);
+    return emails;
+  } catch (err) {
+    wrapGoogleError(err, userId);
+  }
+}
+
 async function getSentEmailsForAccount(
   userId: string,
   maxResults: number,

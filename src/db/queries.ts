@@ -369,6 +369,24 @@ export function deleteTask(id: number): void {
     .run(id);
 }
 
+// ── Email Cache ──
+
+export function getCachedEmailCategory(messageId: string, userId: string): string | null {
+  const row = getDb().prepare(`
+    SELECT category FROM email_cache
+    WHERE message_id = ? AND user_id = ?
+    AND cached_at >= datetime('now', '-7 days', 'localtime')
+  `).get(messageId, userId) as { category: string } | undefined;
+  return row?.category ?? null;
+}
+
+export function setCachedEmailCategory(messageId: string, userId: string, category: string): void {
+  getDb().prepare(`
+    INSERT OR REPLACE INTO email_cache (message_id, user_id, category, cached_at)
+    VALUES (?, ?, ?, datetime('now', 'localtime'))
+  `).run(messageId, userId, category);
+}
+
 // ── Usage Logs ──
 
 export function getMonthlyUsage(userId: string, actionType: string): number {

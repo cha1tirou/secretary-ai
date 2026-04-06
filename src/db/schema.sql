@@ -83,3 +83,11 @@ CREATE TABLE IF NOT EXISTS pending_replies (
   created_at       DATETIME DEFAULT CURRENT_TIMESTAMP, -- [PG] TIMESTAMPTZ DEFAULT NOW()
   sent_at          DATETIME                            -- [PG] TIMESTAMPTZ
 );
+
+CREATE TABLE IF NOT EXISTS email_cache (
+  message_id  TEXT NOT NULL,
+  user_id     TEXT NOT NULL,
+  category    TEXT NOT NULL,
+  cached_at   TEXT DEFAULT (datetime('now', 'localtime')),
+  PRIMARY KEY (message_id, user_id)
+);

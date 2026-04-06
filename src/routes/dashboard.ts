@@ -1,8 +1,8 @@
 import { Hono } from "hono";
-import { getUnreadEmails, getSentEmails, checkThreadReplied, getThread, sendReply } from "../integrations/gmail.js";
+import { getRecentEmails, getSentEmails, checkThreadReplied, getThread, sendReply } from "../integrations/gmail.js";
+import { classifyEmailWithCache } from "../agents/classifier.js";
 import { getWeekEvents } from "../integrations/gcal.js";
 import {
-  getDb,
   getGoogleAccountsByUserId,
   getUser,
   getPendingReply,
@@ -97,29 +97,22 @@ dashboard.get("/dashboard", async (c) => {
       </body></html>`);
     }
 
-    // \u8981\u8FD4\u4FE1\u30E1\u30FC\u30EB
-    const db = getDb();
-    const unrepliedRows = db.prepare(`
-      SELECT pe.message_id FROM processed_emails pe
-      WHERE pe.user_id = ?
-        AND pe.category IN ('urgent_reply', 'reply_later')
-        AND NOT EXISTS (
-          SELECT 1 FROM pending_replies pr
-          WHERE pr.user_id = pe.user_id AND pr.status = 'sent'
-            AND pr.subject LIKE '%' || pe.message_id || '%'
-        )
-      ORDER BY pe.processed_at DESC
-      LIMIT 10
-    `).all(userId) as { message_id: string }[];
+    // \u8981\u8FD4\u4FE1\u30E1\u30FC\u30EB: \u53D7\u4FE1\u7BB214\u65E5\u5206\u3092\u5206\u985E\u3057\u3066\u30D5\u30A3\u30EB\u30BF
+    const recentEmails = await getRecentEmails(userId, 14).catch(() => [] as Email[]);
+    const myEmails = accounts.map((a) => a.email).filter((e): e is string => e !== null);
 
-    const unread = await getUnreadEmails(userId).catch(() => [] as Email[]);
-    const unrepliedEmails = unrepliedRows
-      .map((row) => unread.find((e) => e.id === row.message_id))
-      .filter((e): e is Email => e !== undefined)
-      .filter((e) => e.subject && e.subject.trim() !== "" && e.subject.trim() !== "Re:");
+    const unrepliedEmails: Email[] = [];
+    for (const email of recentEmails) {
+      if (unrepliedEmails.length >= 10) break;
+      if (!email.subject || email.subject.trim() === "" || email.subject.trim() === "Re:") continue;
+      const category = await classifyEmailWithCache(email, userId, myEmails[0]).catch(() => "fyi" as const);
+      if (category !== "reply_later" && category !== "urgent_reply") continue;
+      const replied = await checkThreadReplied(email.threadId, userId, myEmails).catch(() => true);
+      if (replied) continue;
+      unrepliedEmails.push(email);
+    }
 
     // \u8FD4\u4FE1\u5F85\u3061\u30E1\u30FC\u30EB
-    const myEmails = accounts.map((a) => a.email).filter((e): e is string => e !== null);
     const sent = await getSentEmails(userId, 30).catch(() => [] as Email[]);
     const awaitingReply: AwaitingEmail[] = [];
 

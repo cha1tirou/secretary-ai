@@ -26,15 +26,6 @@ startAutoDraft();
 // ヘルスチェック
 app.get("/health", (c) => c.json({ status: "ok" }));
 
-// 一時管理エンドポイント（使用後に削除予定）
-app.post("/admin/clear-cache", async (c) => {
-  const secret = c.req.query("secret");
-  if (secret !== "secretary-admin-2026") return c.text("forbidden", 403);
-  const { getDb } = await import("./db/queries.js");
-  const db = getDb();
-  const result = db.prepare("DELETE FROM email_cache").run();
-  return c.json({ deleted: result.changes });
-});
 
 // LP（ランディングページ）
 app.get("/", (c) => {

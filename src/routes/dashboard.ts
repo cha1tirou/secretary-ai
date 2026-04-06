@@ -3,6 +3,7 @@ import { getRecentEmails, getSentEmails, checkThreadReplied, getThread, sendRepl
 import { classifyEmailWithCache } from "../agents/classifier.js";
 import { getWeekEvents } from "../integrations/gcal.js";
 import {
+  getDb,
   getGoogleAccountsByUserId,
   getUser,
   getPendingReply,
@@ -12,6 +13,9 @@ import {
   logUsage,
   getResetDate,
   USAGE_LIMITS,
+  getTasks,
+  createTask,
+  updateTaskStatus,
 } from "../db/queries.js";
 import { buildAuthUrl } from "../integrations/auth.js";
 import { checkAndNotifyUsageAlert } from "../utils/usage.js";
@@ -391,6 +395,81 @@ dashboard.post("/reply/skip", async (c) => {
   }
 });
 
+// ── Task Routes ──
+
+dashboard.get("/dashboard/tasks", (c) => {
+  const userId = getToken(c);
+  if (!userId) return c.text("token required", 401);
+  try {
+    const user = getUser(userId);
+    if (!user) return c.text("user not found", 404);
+    const todos = getTasks(userId, "todo");
+    const dones = getTasks(userId, "done").slice(0, 10);
+    return c.html(buildTasksHtml(userId, todos, dones));
+  } catch (err) {
+    console.error("[dashboard/tasks] error:", err);
+    return c.text("Internal Server Error", 500);
+  }
+});
+
+dashboard.post("/dashboard/tasks/add", async (c) => {
+  const userId = getToken(c);
+  if (!userId) return c.text("token required", 401);
+  try {
+    const body = await c.req.parseBody();
+    const title = ((body["title"] as string) ?? "").trim();
+    const dueDate = ((body["dueDate"] as string) ?? "").trim() || undefined;
+    if (title) createTask(userId, title, undefined, dueDate);
+    return c.redirect(`/dashboard/tasks?token=${userId}`);
+  } catch (err) {
+    console.error("[dashboard/tasks/add] error:", err);
+    return c.text("Internal Server Error", 500);
+  }
+});
+
+dashboard.post("/dashboard/tasks/done", async (c) => {
+  const userId = getToken(c);
+  if (!userId) return c.text("token required", 401);
+  try {
+    const body = await c.req.parseBody();
+    const id = Number(body["id"]);
+    updateTaskStatus(id, "done");
+    return c.redirect(`/dashboard/tasks?token=${userId}`);
+  } catch (err) {
+    return c.text("Internal Server Error", 500);
+  }
+});
+
+dashboard.post("/dashboard/tasks/edit", async (c) => {
+  const userId = getToken(c);
+  if (!userId) return c.text("token required", 401);
+  try {
+    const body = await c.req.parseBody();
+    const id = Number(body["id"]);
+    const title = ((body["title"] as string) ?? "").trim();
+    const dueDate = ((body["dueDate"] as string) ?? "").trim() || null;
+    if (title) {
+      getDb().prepare("UPDATE tasks SET title = ?, due_date = ? WHERE id = ? AND user_id = ?").run(title, dueDate, id, userId);
+    }
+    return c.redirect(`/dashboard/tasks?token=${userId}`);
+  } catch (err) {
+    return c.text("Internal Server Error", 500);
+  }
+});
+
+dashboard.post("/dashboard/tasks/delete", async (c) => {
+  const userId = getToken(c);
+  if (!userId) return c.text("token required", 401);
+  try {
+    const body = await c.req.parseBody();
+    const id = Number(body["id"]);
+    getDb().prepare("DELETE FROM tasks WHERE id = ? AND user_id = ?").run(id, userId);
+    return c.redirect(`/dashboard/tasks?token=${userId}`);
+  } catch (err) {
+    return c.text("Internal Server Error", 500);
+  }
+});
+
 // ── HTML builders ──
 
 function buildDashboardHtml(
@@ -575,6 +654,94 @@ function toggleEdit() {
     btn.textContent = '\u270F\uFE0F \u7DE8\u96C6\u3059\u308B';
   }
 }
+</script>
+</body>
+</html>`;
+}
+
+function buildTasksHtml(userId: string, todos: any[], dones: any[]): string {
+  const token = userId;
+  const todoRows = todos.map((t: any) => `
+    <div style="border:1px solid #e5e7eb;border-radius:12px;padding:16px;margin-bottom:12px;background:white">
+      <div id="view-${t.id}">
+        <div style="font-weight:600;font-size:15px;margin-bottom:4px">${esc(t.title)}</div>
+        ${t.dueDate ? `<div style="color:#f59e0b;font-size:13px;margin-bottom:8px">\u671F\u65E5: ${esc(t.dueDate)}</div>` : '<div style="margin-bottom:8px"></div>'}
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button onclick="showEdit(${t.id})" style="background:#f3f4f6;color:#374151;border:none;border-radius:8px;padding:6px 12px;font-size:13px;cursor:pointer">\u270F\uFE0F \u7DE8\u96C6</button>
+          <form method="POST" action="/dashboard/tasks/done?token=${token}" style="display:inline">
+            <input type="hidden" name="id" value="${t.id}">
+            <button type="submit" style="background:#06C755;color:white;border:none;border-radius:8px;padding:6px 12px;font-size:13px;cursor:pointer">\u2705 \u5B8C\u4E86</button>
+          </form>
+          <form method="POST" action="/dashboard/tasks/delete?token=${token}" style="display:inline">
+            <input type="hidden" name="id" value="${t.id}">
+            <button type="submit" style="background:#fee2e2;color:#dc2626;border:none;border-radius:8px;padding:6px 12px;font-size:13px;cursor:pointer">\uD83D\uDDD1\uFE0F \u524A\u9664</button>
+          </form>
+        </div>
+      </div>
+      <div id="edit-${t.id}" style="display:none">
+        <form method="POST" action="/dashboard/tasks/edit?token=${token}">
+          <input type="hidden" name="id" value="${t.id}">
+          <input type="text" name="title" value="${esc(t.title)}" style="width:100%;border:1px solid #e5e7eb;border-radius:8px;padding:8px;font-size:14px;box-sizing:border-box;margin-bottom:8px">
+          <input type="date" name="dueDate" value="${esc(t.dueDate ?? "")}" style="width:100%;border:1px solid #e5e7eb;border-radius:8px;padding:8px;font-size:14px;box-sizing:border-box;margin-bottom:8px">
+          <div style="display:flex;gap:8px">
+            <button type="submit" style="background:#06C755;color:white;border:none;border-radius:8px;padding:8px 16px;font-size:13px;cursor:pointer">\u4FDD\u5B58</button>
+            <button type="button" onclick="hideEdit(${t.id})" style="background:#f3f4f6;color:#374151;border:none;border-radius:8px;padding:8px 16px;font-size:13px;cursor:pointer">\u30AD\u30E3\u30F3\u30BB\u30EB</button>
+          </div>
+        </form>
+      </div>
+    </div>`).join("");
+
+  const doneRows = dones.map((t: any) => `
+    <div style="border:1px solid #e5e7eb;border-radius:12px;padding:12px 16px;margin-bottom:8px;background:white;opacity:0.6">
+      <div style="font-size:14px;color:#6b7280;text-decoration:line-through">${esc(t.title)}</div>
+    </div>`).join("");
+
+  return `<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>\u30BF\u30B9\u30AF\u7BA1\u7406</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,sans-serif; background:#f9fafb; min-height:100vh; }
+.header { background:#1a1a2e; color:white; padding:16px 20px; font-size:18px; font-weight:700; }
+.nav { background:white; border-bottom:1px solid #e5e7eb; padding:12px 20px; }
+.nav a { color:#06C755; font-size:14px; text-decoration:none; }
+.container { max-width:600px; margin:0 auto; padding:20px; }
+h2 { font-size:16px; font-weight:700; margin:24px 0 12px; color:#111; }
+.add-form { background:white; border:1px solid #e5e7eb; border-radius:12px; padding:16px; margin-bottom:24px; }
+.add-form input[type=text] { width:100%; border:1px solid #e5e7eb; border-radius:8px; padding:10px; font-size:14px; margin-bottom:8px; box-sizing:border-box; }
+.add-form input[type=date] { width:100%; border:1px solid #e5e7eb; border-radius:8px; padding:10px; font-size:14px; margin-bottom:12px; color:#374151; box-sizing:border-box; }
+.add-btn { width:100%; background:#1a1a2e; color:white; border:none; border-radius:8px; padding:12px; font-size:15px; font-weight:600; cursor:pointer; }
+.empty { color:#9ca3af; font-size:14px; padding:16px 0; }
+details summary { cursor:pointer; color:#6b7280; font-size:14px; font-weight:600; padding:8px 0; }
+</style>
+</head>
+<body>
+<div class="header">\u2705 \u30BF\u30B9\u30AF\u7BA1\u7406</div>
+<div class="nav"><a href="/dashboard?token=${token}">\u2190 \u30E1\u30FC\u30EB\u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9\u306B\u623B\u308B</a></div>
+<div class="container">
+  <h2>+ \u30BF\u30B9\u30AF\u3092\u8FFD\u52A0</h2>
+  <div class="add-form">
+    <form method="POST" action="/dashboard/tasks/add?token=${token}">
+      <input type="text" name="title" placeholder="\u30BF\u30B9\u30AF\u540D\u3092\u5165\u529B..." required>
+      <input type="date" name="dueDate">
+      <button type="submit" class="add-btn">\u8FFD\u52A0\u3059\u308B</button>
+    </form>
+  </div>
+  <h2>\uD83D\uDCCB \u672A\u5B8C\u4E86\u30BF\u30B9\u30AF\uFF08${todos.length}\u4EF6\uFF09</h2>
+  ${todoRows || '<p class="empty">\u672A\u5B8C\u4E86\u306E\u30BF\u30B9\u30AF\u306F\u3042\u308A\u307E\u305B\u3093</p>'}
+  <details style="margin-top:24px">
+    <summary>\u2705 \u5B8C\u4E86\u6E08\u307F\u30BF\u30B9\u30AF\uFF08${dones.length}\u4EF6\uFF09</summary>
+    <div style="margin-top:12px">
+      ${doneRows || '<p class="empty">\u5B8C\u4E86\u6E08\u307F\u30BF\u30B9\u30AF\u306F\u3042\u308A\u307E\u305B\u3093</p>'}
+    </div>
+  </details>
+</div>
+<script>
+function showEdit(id) { document.getElementById('view-'+id).style.display='none'; document.getElementById('edit-'+id).style.display='block'; }
+function hideEdit(id) { document.getElementById('view-'+id).style.display='block'; document.getElementById('edit-'+id).style.display='none'; }
 </script>
 </body>
 </html>`;

@@ -229,12 +229,14 @@ async function execSimpleCommand(cmd: SimpleCommand, userId: string): Promise<st
     }
     case "task_list": {
       const tasks = getTasks(userId, "todo");
-      if (tasks.length === 0) return "タスクはありません。";
-      let text = `タスク一覧（${tasks.length}件）`;
+      const baseUrl = "https://web-production-b2798.up.railway.app";
+      if (tasks.length === 0) return `\u30BF\u30B9\u30AF\u306F\u3042\u308A\u307E\u305B\u3093\u3002\n\n\u30BF\u30B9\u30AF\u7BA1\u7406\u306F\u3053\u3061\u3089\n${baseUrl}/dashboard/tasks?token=${userId}`;
+      let text = `\u30BF\u30B9\u30AF\u4E00\u89A7\uFF08${tasks.length}\u4EF6\uFF09`;
       for (const [i, t] of tasks.entries()) {
-        const due = t.dueDate ? `（期日: ${t.dueDate}）` : "";
+        const due = t.dueDate ? `\uFF08\u671F\u65E5: ${t.dueDate}\uFF09` : "";
         text += `\n${i + 1}. ${t.title}${due}`;
       }
+      text += `\n\n\u8A73\u7D30\u78BA\u8A8D\u30FB\u7DE8\u96C6\u30FB\u5B8C\u4E86\u306F\u3053\u3061\u3089\n${baseUrl}/dashboard/tasks?token=${userId}`;
       return text;
     }
     case "task_add": {
@@ -605,12 +607,14 @@ async function lightPlanProcessor(userId: string, message: string): Promise<stri
 
   if (/タスク|やること|todo/i.test(message)) {
     const tasks = getTasks(userId, "todo");
-    if (tasks.length === 0) return "タスクはありません。";
+    const baseUrl = "https://web-production-b2798.up.railway.app";
+    if (tasks.length === 0) return `タスクはありません。\n\nタスク管理はこちら\n${baseUrl}/dashboard/tasks?token=${userId}`;
     let text = `タスク一覧（${tasks.length}件）`;
     for (const [i, t] of tasks.entries()) {
       const due = t.dueDate ? `（期日: ${t.dueDate}）` : "";
       text += `\n${i + 1}. ${t.title}${due}`;
     }
+    text += `\n\n詳細確認・編集・完了はこちら\n${baseUrl}/dashboard/tasks?token=${userId}`;
     return text;
   }
   if (/保留/.test(message)) {

@@ -3,7 +3,7 @@ import { getTodayEvents, getTomorrowEvents } from "../integrations/gcal.js";
 import { getRecentEmails, getSentEmails, checkThreadReplied } from "../integrations/gmail.js";
 import { getWeatherSummary, getTomorrowWeatherSummary } from "../integrations/weather.js";
 import { classifyEmailWithCache } from "./classifier.js";
-import { getGoogleAccountsByUserId } from "../db/queries.js";
+import { getGoogleAccountsByUserId, getTasks } from "../db/queries.js";
 import type { CalendarEvent, Email } from "../types.js";
 
 const isDev = process.env["NODE_ENV"] === "development";
@@ -30,6 +30,7 @@ type MorningContext = {
   unreadCount: number;
   needsReplyEmails: NeedsReplyEmail[];
   awaitingReplyEmails: AwaitingReplyEmail[];
+  tasks: { id: number; title: string; dueDate?: string | null }[];
 };
 
 // ── Morning Briefing (8:00, Haiku) ──
@@ -79,7 +80,9 @@ async function buildMorningContext(userId: string): Promise<MorningContext> {
     awaitingReplyEmails.push({ to: fmtFrom(toAddr), subject: email.subject, daysAgo });
   }
 
-  return { weather, events, unreadCount, needsReplyEmails, awaitingReplyEmails };
+  const tasks = getTasks(userId, "todo").slice(0, 5).map((t) => ({ id: t.id, title: t.title, dueDate: t.dueDate }));
+
+  return { weather, events, unreadCount, needsReplyEmails, awaitingReplyEmails, tasks };
 }
 
 function buildMorningPrompt(ctx: MorningContext): string {
@@ -114,6 +117,9 @@ ${eventSection}
 ## \u6C17\u306B\u306A\u308B\u3053\u3068
 ${concerns.length === 0 ? "\u306A\u3057" : concerns.join("\n")}
 
+## \u30BF\u30B9\u30AF\uFF08${ctx.tasks.length}\u4EF6\uFF09
+${ctx.tasks.length === 0 ? "\u306A\u3057" : ctx.tasks.map((t) => `- ${t.title}${t.dueDate ? `\uFF08\u671F\u65E5: ${t.dueDate}\uFF09` : ""}`).join("\n")}
+
 ## \u672A\u8AAD\u30E1\u30FC\u30EB
 ${ctx.unreadCount}\u4EF6`;
 }
@@ -145,6 +151,13 @@ function buildMorningMock(ctx: MorningContext): string {
   if (concerns.length > 0) {
     text += `\n\u2501\u2501 \u6C17\u306B\u306A\u308B\u3053\u3068 \u2501\u2501\n`;
     text += concerns.join("\n") + "\n";
+  }
+
+  if (ctx.tasks.length > 0) {
+    text += `\n\u2501\u2501 \u30BF\u30B9\u30AF \u2501\u2501\n`;
+    for (const t of ctx.tasks) {
+      text += `\u30FB${t.title}${t.dueDate ? `\uFF08\u671F\u65E5: ${t.dueDate}\uFF09` : ""}\n`;
+    }
   }
 
   if (ctx.unreadCount > 0) {

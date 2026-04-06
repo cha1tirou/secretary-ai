@@ -418,8 +418,26 @@ dashboard.post("/dashboard/tasks/add", async (c) => {
   try {
     const body = await c.req.parseBody();
     const title = ((body["title"] as string) ?? "").trim();
-    const dueDate = ((body["dueDate"] as string) ?? "").trim() || undefined;
-    if (title) createTask(userId, title, undefined, dueDate);
+    if (!title) return c.redirect(`/dashboard/tasks?token=${userId}`);
+
+    let dueDate: string | undefined;
+    try {
+      const Anthropic = (await import("@anthropic-ai/sdk")).default;
+      const client = new Anthropic();
+      const today = new Date().toLocaleDateString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit" }).replace(/\//g, "-");
+      const msg = await client.messages.create({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 64,
+        messages: [{
+          role: "user",
+          content: `\u4EE5\u4E0B\u306E\u30BF\u30B9\u30AF\u6587\u7AE0\u304B\u3089\u671F\u65E5\u3092\u62BD\u51FA\u3057\u3066\u304F\u3060\u3055\u3044\u3002\n\u30BF\u30B9\u30AF: ${title}\n\u4ECA\u65E5\u306E\u65E5\u4ED8: ${today}\n\n\u671F\u65E5\u304C\u3042\u308B\u5834\u5408\u306FYYYY-MM-DD\u5F62\u5F0F\u3067\u8FD4\u3057\u3066\u304F\u3060\u3055\u3044\u3002\n\u671F\u65E5\u304C\u306A\u3044\u5834\u5408\u306F\u300C\u306A\u3057\u300D\u3068\u8FD4\u3057\u3066\u304F\u3060\u3055\u3044\u3002\n\u671F\u65E5\u306E\u307F\u3092\u51FA\u529B\u3057\u3066\u304F\u3060\u3055\u3044\u3002`,
+        }],
+      });
+      const result = msg.content[0]?.type === "text" ? msg.content[0].text.trim() : "\u306A\u3057";
+      if (result !== "\u306A\u3057" && /^\d{4}-\d{2}-\d{2}$/.test(result)) dueDate = result;
+    } catch { /* ignore */ }
+
+    createTask(userId, title, undefined, dueDate);
     return c.redirect(`/dashboard/tasks?token=${userId}`);
   } catch (err) {
     console.error("[dashboard/tasks/add] error:", err);
@@ -711,8 +729,7 @@ body { font-family:-apple-system,sans-serif; background:#f9fafb; min-height:100v
 .container { max-width:600px; margin:0 auto; padding:20px; }
 h2 { font-size:16px; font-weight:700; margin:24px 0 12px; color:#111; }
 .add-form { background:white; border:1px solid #e5e7eb; border-radius:12px; padding:16px; margin-bottom:24px; }
-.add-form input[type=text] { width:100%; border:1px solid #e5e7eb; border-radius:8px; padding:10px; font-size:14px; margin-bottom:8px; box-sizing:border-box; }
-.add-form input[type=date] { width:100%; border:1px solid #e5e7eb; border-radius:8px; padding:10px; font-size:14px; margin-bottom:12px; color:#374151; box-sizing:border-box; }
+.add-form input[type=text] { width:100%; border:1px solid #e5e7eb; border-radius:8px; padding:10px; font-size:14px; margin-bottom:12px; box-sizing:border-box; }
 .add-btn { width:100%; background:#1a1a2e; color:white; border:none; border-radius:8px; padding:12px; font-size:15px; font-weight:600; cursor:pointer; }
 .empty { color:#9ca3af; font-size:14px; padding:16px 0; }
 details summary { cursor:pointer; color:#6b7280; font-size:14px; font-weight:600; padding:8px 0; }
@@ -725,8 +742,7 @@ details summary { cursor:pointer; color:#6b7280; font-size:14px; font-weight:600
   <h2>+ \u30BF\u30B9\u30AF\u3092\u8FFD\u52A0</h2>
   <div class="add-form">
     <form method="POST" action="/dashboard/tasks/add?token=${token}">
-      <input type="text" name="title" placeholder="\u30BF\u30B9\u30AF\u540D\u3092\u5165\u529B..." required>
-      <input type="date" name="dueDate">
+      <input type="text" name="title" placeholder="\u4F8B\uFF09\u3042\u3055\u3063\u3066\u307E\u3067\u306B\u5C71\u7530\u3055\u3093\u306B\u8CC7\u6599\u63D0\u51FA" required>
       <button type="submit" class="add-btn">\u8FFD\u52A0\u3059\u308B</button>
     </form>
   </div>

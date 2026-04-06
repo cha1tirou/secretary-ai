@@ -230,18 +230,20 @@ async function execSimpleCommand(cmd: SimpleCommand, userId: string): Promise<st
     case "task_list": {
       const tasks = getTasks(userId, "todo");
       const baseUrl = "https://web-production-b2798.up.railway.app";
-      if (tasks.length === 0) return `\u30BF\u30B9\u30AF\u306F\u3042\u308A\u307E\u305B\u3093\u3002\n\n\u30BF\u30B9\u30AF\u7BA1\u7406\u306F\u3053\u3061\u3089\n${baseUrl}/dashboard/tasks?token=${userId}`;
+      const tasksUrl = `${baseUrl}/dashboard/tasks?token=${userId}`;
+      if (tasks.length === 0) return `\u30BF\u30B9\u30AF\u306F\u3042\u308A\u307E\u305B\u3093\u3002\n\n\u2192 \u30BF\u30B9\u30AF\u7BA1\u7406\n${tasksUrl}`;
       let text = `\u30BF\u30B9\u30AF\u4E00\u89A7\uFF08${tasks.length}\u4EF6\uFF09`;
       for (const [i, t] of tasks.entries()) {
         const due = t.dueDate ? `\uFF08\u671F\u65E5: ${t.dueDate}\uFF09` : "";
         text += `\n${i + 1}. ${t.title}${due}`;
       }
-      text += `\n\n\u8A73\u7D30\u78BA\u8A8D\u30FB\u7DE8\u96C6\u30FB\u5B8C\u4E86\u306F\u3053\u3061\u3089\n${baseUrl}/dashboard/tasks?token=${userId}`;
+      text += `\n\n\u2192 \u8FFD\u52A0\u30FB\u7DE8\u96C6\u30FB\u5B8C\u4E86\u306F\u3053\u3061\u3089\n${tasksUrl}`;
       return text;
     }
     case "task_add": {
       createTask(userId, cmd.title);
-      return `タスクに追加しました: ${cmd.title}`;
+      const tasksUrl = `https://web-production-b2798.up.railway.app/dashboard/tasks?token=${userId}`;
+      return `\u30BF\u30B9\u30AF\u306B\u8FFD\u52A0\u3057\u307E\u3057\u305F: ${cmd.title}\n\n\u2192 \u30BF\u30B9\u30AF\u4E00\u89A7\u306F\u3053\u3061\u3089\n${tasksUrl}`;
     }
     case "task_done": {
       const numMatch = cmd.raw.match(/(\d+)/);
@@ -268,7 +270,7 @@ async function execSimpleCommand(cmd: SimpleCommand, userId: string): Promise<st
     }
     case "dashboard": {
       const baseUrl = "https://web-production-b2798.up.railway.app";
-      return `\uD83D\uDCEC \u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9\u306F\u3053\u3061\u3089\u304B\u3089\u958B\u3051\u307E\u3059\u3002\n\n${baseUrl}/dashboard?token=${userId}\n\n\u8981\u8FD4\u4FE1\u30E1\u30FC\u30EB\u306E\u51E6\u7406\u3084\u8FD4\u4FE1\u5F85\u3061\u30E1\u30FC\u30EB\u306E\u78BA\u8A8D\u304C\u3067\u304D\u307E\u3059\u3002`;
+      return `\uD83D\uDCEC \u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9\u306F\u3053\u3061\u3089\u304B\u3089\u958B\u3051\u307E\u3059\u3002\n\n\u3010\u30E1\u30FC\u30EB\u51E6\u7406\u3011\n${baseUrl}/dashboard?token=${userId}\n\n\u3010\u30BF\u30B9\u30AF\u7BA1\u7406\u3011\n${baseUrl}/dashboard/tasks?token=${userId}`;
     }
   }
 }
@@ -507,7 +509,11 @@ function buildSystemPrompt(userId: string): string {
   「返信が必要なメールはダッシュボードで確認・処理できます。\n${dashboardUrl}」
 - get_emailsで取得したメールのうち、返信が必要と判断したもの（質問・依頼・日程調整・確認依頼など）だけを返す
 - 返信不要なもの（お知らせ・領収書・自動送信・no-reply）は除外する
-- 今月の予定を聞かれたらget_month_eventsツールを使う`;
+- 今月の予定を聞かれたらget_month_eventsツールを使う
+
+タスク管理ルール：
+- タスクの確認・編集・完了を求められたらダッシュボードURLを案内する
+  URL: https://web-production-b2798.up.railway.app/dashboard/tasks?token=${userId}`;
 }
 
 // ── Plan Messages ──
@@ -601,20 +607,22 @@ async function lightPlanProcessor(userId: string, message: string): Promise<stri
     const title = (taskAddMatch[1] || taskAddMatch[2] || "").trim();
     if (title) {
       createTask(userId, title);
-      return `タスクに追加しました\n「${title}」`;
+      const tasksUrl = `https://web-production-b2798.up.railway.app/dashboard/tasks?token=${userId}`;
+      return `タスクに追加しました\n「${title}」\n\n→ タスク一覧はこちら\n${tasksUrl}`;
     }
   }
 
   if (/タスク|やること|todo/i.test(message)) {
     const tasks = getTasks(userId, "todo");
     const baseUrl = "https://web-production-b2798.up.railway.app";
-    if (tasks.length === 0) return `タスクはありません。\n\nタスク管理はこちら\n${baseUrl}/dashboard/tasks?token=${userId}`;
+    const tasksUrl = `${baseUrl}/dashboard/tasks?token=${userId}`;
+    if (tasks.length === 0) return `タスクはありません。\n\n→ タスク管理\n${tasksUrl}`;
     let text = `タスク一覧（${tasks.length}件）`;
     for (const [i, t] of tasks.entries()) {
       const due = t.dueDate ? `（期日: ${t.dueDate}）` : "";
       text += `\n${i + 1}. ${t.title}${due}`;
     }
-    text += `\n\n詳細確認・編集・完了はこちら\n${baseUrl}/dashboard/tasks?token=${userId}`;
+    text += `\n\n→ 追加・編集・完了はこちら\n${tasksUrl}`;
     return text;
   }
   if (/保留/.test(message)) {
@@ -632,7 +640,7 @@ async function lightPlanProcessor(userId: string, message: string): Promise<stri
   }
   if (/ダッシュボード|メール処理|メール作業|返信まとめ/.test(message)) {
     const baseUrl = "https://web-production-b2798.up.railway.app";
-    return `\uD83D\uDCEC \u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9\u306F\u3053\u3061\u3089\u304B\u3089\u958B\u3051\u307E\u3059\u3002\n\n${baseUrl}/dashboard?token=${userId}\n\n\u8981\u8FD4\u4FE1\u30E1\u30FC\u30EB\u306E\u51E6\u7406\u3084\u8FD4\u4FE1\u5F85\u3061\u30E1\u30FC\u30EB\u306E\u78BA\u8A8D\u304C\u3067\u304D\u307E\u3059\u3002`;
+    return `\uD83D\uDCEC \u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9\u306F\u3053\u3061\u3089\u304B\u3089\u958B\u3051\u307E\u3059\u3002\n\n\u3010\u30E1\u30FC\u30EB\u51E6\u7406\u3011\n${baseUrl}/dashboard?token=${userId}\n\n\u3010\u30BF\u30B9\u30AF\u7BA1\u7406\u3011\n${baseUrl}/dashboard/tasks?token=${userId}`;
   }
 
   return LIGHT_UPGRADE_MESSAGE;

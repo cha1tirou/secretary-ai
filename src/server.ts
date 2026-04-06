@@ -1,8 +1,8 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import "dotenv/config";
-import { readFileSync } from "fs";
-import { join } from "path";
+import { readFileSync, mkdirSync } from "fs";
+import { join, dirname } from "path";
 import { initDb } from "./db/queries.js";
 import { webhook } from "./handlers/webhook.js";
 import { auth } from "./integrations/auth.js";
@@ -11,6 +11,10 @@ import { startAutoDraft } from "./cron/auto-draft.js";
 import { dashboard } from "./routes/dashboard.js";
 
 const app = new Hono();
+
+// DB_PATHのディレクトリを事前に作成（永続ボリューム対応）
+const dbPath = process.env["DB_PATH"] ?? "./data/secretary.db";
+mkdirSync(dirname(dbPath), { recursive: true });
 
 // DB初期化
 initDb();

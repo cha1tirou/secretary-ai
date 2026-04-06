@@ -535,47 +535,6 @@ const EXPIRED_MESSAGE = `7日間の無料体験が終了しました。
 
 ※決済機能は近日公開予定です。それまでの間は引き続き全機能をお使いいただけます。`;
 
-const LIGHT_UPGRADE_MESSAGE = `このコマンドはプロプランでご利用いただけます。
-
-使えるコマンド：
-・今日の予定
-・今週の予定
-・今月の予定
-・未読メール
-・急ぎメール
-・タスク一覧
-・タスク追加
-・保留メール一覧
-
-プロプラン（980円/月）ではAIとの自由な対話にも対応できます。
-※決済機能は近日公開予定です。`;
-
-// ── Light Plan Processor ──
-
-async function lightPlanProcessor(userId: string, message: string): Promise<string> {
-  // SimpleCommand\u306F\u65E2\u306BhandleWithSecretary\u3067\u51E6\u7406\u6E08\u307F\u3002\u3053\u3053\u306F\u6B8B\u308A\u306E\u30D1\u30BF\u30FC\u30F3\u306E\u307F\u3002
-  if (/\u6025\u304E|\u91CD\u8981.*\u30E1\u30FC\u30EB/.test(message)) {
-    const emails = await getAllEmails(userId, 30);
-    const needReply = emails.filter((e) => {
-      const text = e.subject + e.body;
-      return /\u6025\u304E|\u81F3\u6025|urgent/i.test(text);
-    });
-    if (needReply.length === 0) return "\u6025\u304E\u306E\u30E1\u30FC\u30EB\u306F\u3042\u308A\u307E\u305B\u3093\u3002";
-    let text = `\u6025\u304E\u306E\u30E1\u30FC\u30EB\uFF08${needReply.length}\u4EF6\uFF09`;
-    for (const e of needReply.slice(0, 5)) {
-      const from = (e.from.split("<")[0] ?? "").trim() || e.from;
-      text += `\n\n\u30FB${from}\n\u3000${e.subject}`;
-    }
-    return text;
-  }
-  if (/\u8981\u8FD4\u4FE1|\u8FD4\u4FE1\u3059\u3079\u304D|\u8FD4\u4FE1\u304C\u5FC5\u8981/.test(message)) {
-    const baseUrl = "https://web-production-b2798.up.railway.app";
-    return `\uD83D\uDCEC \u8FD4\u4FE1\u304C\u5FC5\u8981\u306A\u30E1\u30FC\u30EB\u306F\u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9\u3067\u78BA\u8A8D\u30FB\u51E6\u7406\u3067\u304D\u307E\u3059\u3002\n\n${baseUrl}/dashboard?token=${userId}`;
-  }
-
-  return LIGHT_UPGRADE_MESSAGE;
-}
-
 // ── Plan Check ──
 
 function checkPlan(userId: string): { plan: Plan; trialWarning?: string } {
@@ -636,14 +595,8 @@ export async function handleWithSecretary(
       return result;
     }
 
-    if (plan === "light") {
-      console.log(`[secretary] lightPlanProcessor`);
-      result = await lightPlanProcessor(userId, userText);
-      addConversation(userId, "user", userText, "light");
-      addConversation(userId, "assistant", result);
-    } else {
-      result = await proAgentLoop(userId, userText, plan);
-    }
+    // \u5168\u30D7\u30E9\u30F3\u3067proAgentLoop\uFF08\u30AF\u30EC\u30B8\u30C3\u30C8\u4E0A\u9650\u306FproAgentLoop\u5185\u3067\u30C1\u30A7\u30C3\u30AF\uFF09
+    result = await proAgentLoop(userId, userText, plan);
   } catch (err) {
     console.error(`[secretary] handleWithSecretary error (${userId}):`, err);
     return classifyError(err, userId);

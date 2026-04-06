@@ -219,7 +219,8 @@ export async function generateNoonBriefing(userId: string): Promise<string> {
     // 要返信メール（キャッシュ付き分類）
     const recentEmails = await getRecentEmails(userId, 14).catch(() => [] as Email[]);
     let needsReplyCount = 0;
-    for (const email of recentEmails.slice(0, 20)) {
+    for (const email of recentEmails) {
+      if (needsReplyCount >= 5) break;
       if (!email.subject || email.subject.trim() === "") continue;
       const cat = await classifyEmailWithCache(email, userId, myEmails[0]).catch(() => "fyi" as const);
       if (cat !== "reply_later" && cat !== "urgent_reply") continue;
@@ -254,7 +255,8 @@ export async function generateEveningBriefing(userId: string): Promise<string> {
     ]);
 
     let needsReplyCount = 0;
-    for (const email of recentEmails.slice(0, 20)) {
+    for (const email of recentEmails) {
+      if (needsReplyCount >= 5) break;
       if (!email.subject || email.subject.trim() === "") continue;
       const cat = await classifyEmailWithCache(email, userId, myEmails[0]).catch(() => "fyi" as const);
       if (cat !== "reply_later" && cat !== "urgent_reply") continue;

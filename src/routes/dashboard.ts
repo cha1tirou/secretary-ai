@@ -109,6 +109,7 @@ dashboard.get("/dashboard", async (c) => {
     for (const email of recentEmails) {
       if (unrepliedEmails.length >= 10) break;
       if (!email.subject || email.subject.trim() === "" || email.subject.trim() === "Re:") continue;
+      if (/no-?reply|noreply|newsletter|notifications?|donotreply|marketing/i.test(email.from)) continue;
       const category = await classifyEmailWithCache(email, userId, myEmails[0]).catch(() => "fyi" as const);
       if (category !== "reply_later" && category !== "urgent_reply") continue;
       const replied = await checkThreadReplied(email.threadId, userId, myEmails).catch(() => true);
@@ -124,13 +125,12 @@ dashboard.get("/dashboard", async (c) => {
 
     if (myEmails.length > 0) {
       for (const email of sent) {
+        if (awaitingReply.length >= 5) break;
         if (!email.subject || email.subject.trim() === "" || email.subject.trim() === "Re:") continue;
-
         const sentDate = new Date(email.date).getTime();
         if (isNaN(sentDate)) continue;
         const daysAgo = Math.floor((Date.now() - sentDate) / 86400000);
         if (daysAgo < 3 || daysAgo > 90) continue;
-        if (awaitingReply.length >= 5) break;
 
         const toAddresses = email.to.split(/[,;]/).map((a) => a.trim()).filter(Boolean);
         const otherRecipients = toAddresses.filter((a) =>

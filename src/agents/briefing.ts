@@ -170,7 +170,7 @@ function buildMorningMock(ctx: MorningContext): string {
 
 export async function generateBriefing(userId: string): Promise<string> {
   const ctx = await buildMorningContext(userId);
-  const dashboardLink = `\n\n\u2192 \u30E1\u30FC\u30EB\u51E6\u7406\u306F\u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9\u304B\u3089\nhttps://web-production-b2798.up.railway.app/dashboard?token=${userId}`;
+  const dashboardLink = `\n\n\u2192 \u30E1\u30FC\u30EB\u51E6\u7406\nhttps://web-production-b2798.up.railway.app/dashboard?token=${userId}\n\n\u2192 \u30BF\u30B9\u30AF\u7BA1\u7406\nhttps://web-production-b2798.up.railway.app/dashboard/tasks?token=${userId}`;
 
   if (isDev) {
     return buildMorningMock(ctx) + dashboardLink;
@@ -232,7 +232,7 @@ export async function generateNoonBriefing(userId: string): Promise<string> {
       text += `\u30FB\u672A\u8FD4\u4FE1\u30E1\u30FC\u30EB\u304C${needsReplyCount}\u4EF6\u3042\u308A\u307E\u3059\n`;
     }
 
-    text += `\n\u2192 \u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9\u3067\u78BA\u8A8D\nhttps://web-production-b2798.up.railway.app/dashboard?token=${userId}`;
+    text += `\n\u2192 \u30E1\u30FC\u30EB\u51E6\u7406\nhttps://web-production-b2798.up.railway.app/dashboard?token=${userId}\n\n\u2192 \u30BF\u30B9\u30AF\u7BA1\u7406\nhttps://web-production-b2798.up.railway.app/dashboard/tasks?token=${userId}`;
     return text.trim();
   } catch (err) {
     console.error("[briefing] noon error:", err);
@@ -282,9 +282,7 @@ export async function generateEveningBriefing(userId: string): Promise<string> {
 
     if (tomorrowWeather) text += `\n${tomorrowWeather}\n`;
 
-    if (needsReplyCount > 0) {
-      text += `\n\u2192 \u7A4D\u307F\u6B8B\u3057\u306F\u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9\u304B\u3089\nhttps://web-production-b2798.up.railway.app/dashboard?token=${userId}\n`;
-    }
+    text += `\n\u2192 \u30E1\u30FC\u30EB\u51E6\u7406\nhttps://web-production-b2798.up.railway.app/dashboard?token=${userId}\n\n\u2192 \u30BF\u30B9\u30AF\u7BA1\u7406\nhttps://web-production-b2798.up.railway.app/dashboard/tasks?token=${userId}\n`;
 
     text += "\n\u660E\u65E5\u3082\u3088\u3044\u4E00\u65E5\u3092\u3002";
 

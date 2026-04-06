@@ -52,7 +52,9 @@ async function buildMorningContext(userId: string): Promise<MorningContext> {
   const needsReplyEmails: NeedsReplyEmail[] = [];
   for (const email of recentEmails) {
     if (needsReplyEmails.length >= 3) break;
-    if (!email.subject || email.subject.trim() === "") continue;
+    const subjectClean = (email.subject ?? "").trim();
+    const isAutoSender = /no-?reply|noreply|newsletter|notifications?|donotreply|marketing|bounce/i.test(email.from);
+    if (subjectClean === "" && isAutoSender) continue;
     const category = await classifyEmailWithCache(email, userId, myEmails[0]).catch(() => "fyi" as const);
     if (category !== "reply_later" && category !== "urgent_reply") continue;
     const replied = await checkThreadReplied(email.threadId, userId, myEmails).catch(() => true);
@@ -221,7 +223,9 @@ export async function generateNoonBriefing(userId: string): Promise<string> {
     let needsReplyCount = 0;
     for (const email of recentEmails) {
       if (needsReplyCount >= 5) break;
-      if (!email.subject || email.subject.trim() === "") continue;
+      const noonSubject = (email.subject ?? "").trim();
+      const noonAutoSender = /no-?reply|noreply|newsletter|notifications?|donotreply|marketing|bounce/i.test(email.from);
+      if (noonSubject === "" && noonAutoSender) continue;
       const cat = await classifyEmailWithCache(email, userId, myEmails[0]).catch(() => "fyi" as const);
       if (cat !== "reply_later" && cat !== "urgent_reply") continue;
       const replied = await checkThreadReplied(email.threadId, userId, myEmails).catch(() => true);
@@ -257,7 +261,9 @@ export async function generateEveningBriefing(userId: string): Promise<string> {
     let needsReplyCount = 0;
     for (const email of recentEmails) {
       if (needsReplyCount >= 5) break;
-      if (!email.subject || email.subject.trim() === "") continue;
+      const eveSubject = (email.subject ?? "").trim();
+      const eveAutoSender = /no-?reply|noreply|newsletter|notifications?|donotreply|marketing|bounce/i.test(email.from);
+      if (eveSubject === "" && eveAutoSender) continue;
       const cat = await classifyEmailWithCache(email, userId, myEmails[0]).catch(() => "fyi" as const);
       if (cat !== "reply_later" && cat !== "urgent_reply") continue;
       const replied = await checkThreadReplied(email.threadId, userId, myEmails).catch(() => true);

@@ -194,7 +194,7 @@ function buildWelcomeMessages(authUrl: string): { batch1: any[]; batch2: any[] }
       "\uD83D\uDCCB \u3054\u5229\u7528\u30D7\u30E9\u30F3\u306B\u3064\u3044\u3066",
       "",
       "Trial\uFF087\u65E5\u9593\u7121\u6599\uFF09",
-      "\u30FB30\u30AF\u30EC\u30B8\u30C3\u30C8/\u6708",
+      "\u30FB30\u30AF\u30EC\u30B8\u30C3\u30C8\uFF087\u65E5\u9593\u9650\u5B9A\uFF09",
       "",
       "Light\uFF08\u6708480\u5186\uFF09",
       "\u30FB100\u30AF\u30EC\u30B8\u30C3\u30C8/\u6708",

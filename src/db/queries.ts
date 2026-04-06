@@ -65,6 +65,9 @@ export function initDb(): void {
       ).run(row.user_id, row.gmail_token, row.gcal_token);
     }
   }
+
+  // 起動時にemail_cacheの古いエントリを削除（7日以上前）
+  d.exec(`DELETE FROM email_cache WHERE cached_at < datetime('now', '-7 days', 'localtime')`);
 }
 
 // ── Users ──
@@ -390,13 +393,11 @@ export function setCachedEmailCategory(messageId: string, userId: string, catego
 // ── Usage Logs ──
 
 export function getMonthlyUsage(userId: string, actionType: string): number {
-  const monthStart = new Date();
-  monthStart.setDate(1);
-  monthStart.setHours(0, 0, 0, 0);
   const row = getDb().prepare(`
     SELECT COUNT(*) as count FROM usage_logs
-    WHERE user_id = ? AND action_type = ? AND created_at >= ?
-  `).get(userId, actionType, monthStart.toISOString()) as { count: number };
+    WHERE user_id = ? AND action_type = ?
+    AND created_at >= date('now', 'start of month', 'localtime')
+  `).get(userId, actionType) as { count: number };
   return row.count;
 }
 

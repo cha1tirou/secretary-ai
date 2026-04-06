@@ -28,7 +28,18 @@ function esc(str: string): string {
 }
 
 function fmtFrom(from: string): string {
-  return (from.split("<")[0] ?? "").trim() || from;
+  const match = from.match(/^([^<]+)<[^>]+>/);
+  if (match && match[1]?.trim()) {
+    return match[1].trim().replace(/"/g, "");
+  }
+  const emailOnly = from.replace(/<|>/g, "").trim();
+  const localPart = emailOnly.split("@")[0] ?? emailOnly;
+  return localPart.length > 20 ? localPart.slice(0, 20) + "..." : localPart;
+}
+
+function isMarketingDomain(email: string): boolean {
+  const domain = email.split("@")[1]?.toLowerCase() ?? "";
+  return /marketing|newsletter|email\.|mailer|bulk|bounce|campaign|promo/i.test(domain);
 }
 
 function calcFreeSlotsForReply(events: CalendarEvent[]): string {
@@ -104,21 +115,24 @@ dashboard.get("/dashboard", async (c) => {
     const unread = await getUnreadEmails(userId).catch(() => [] as Email[]);
     const unrepliedEmails = unrepliedRows
       .map((row) => unread.find((e) => e.id === row.message_id))
-      .filter((e): e is Email => e !== undefined);
+      .filter((e): e is Email => e !== undefined)
+      .filter((e) => e.subject && e.subject.trim() !== "" && e.subject.trim() !== "Re:");
 
     // \u8FD4\u4FE1\u5F85\u3061\u30E1\u30FC\u30EB
     const myEmails = accounts.map((a) => a.email).filter((e): e is string => e !== null);
     const sent = await getSentEmails(userId, 30).catch(() => [] as Email[]);
     const awaitingReply: AwaitingEmail[] = [];
 
-    const SKIP_TO_PATTERNS = /no-?reply|noreply|unsubscribe|newsletter|notifications?|donotreply/i;
+    const SKIP_TO_PATTERNS = /no-?reply|noreply|unsubscribe|newsletter|notifications?|donotreply|marketing|bounce|mailer|sendgrid|mailchimp|em\d+\.|mailing|bulk/i;
 
     if (myEmails.length > 0) {
       for (const email of sent) {
+        if (!email.subject || email.subject.trim() === "" || email.subject.trim() === "Re:") continue;
+
         const sentDate = new Date(email.date).getTime();
         if (isNaN(sentDate)) continue;
         const daysAgo = Math.floor((Date.now() - sentDate) / 86400000);
-        if (daysAgo < 3) continue;
+        if (daysAgo < 3 || daysAgo > 90) continue;
         if (awaitingReply.length >= 5) break;
 
         const toAddresses = email.to.split(/[,;]/).map((a) => a.trim()).filter(Boolean);
@@ -128,7 +142,7 @@ dashboard.get("/dashboard", async (c) => {
         if (otherRecipients.length === 0) continue;
 
         const recipientAddress = otherRecipients[0] ?? email.to;
-        if (SKIP_TO_PATTERNS.test(recipientAddress)) continue;
+        if (SKIP_TO_PATTERNS.test(recipientAddress) || isMarketingDomain(recipientAddress)) continue;
 
         const recipientName = fmtFrom(recipientAddress);
 
@@ -246,7 +260,22 @@ dashboard.post("/dashboard/generate-reminder", async (c) => {
     const to = (body["to"] as string) ?? "";
     const subject = (body["subject"] as string) ?? "";
     const threadId = (body["threadId"] as string) ?? "";
-    const toName = fmtFrom(to);
+    const cleanSubject = subject.replace(/^Re:\s*/i, "").trim();
+    const finalToName = fmtFrom(to) || "ご担当者";
+
+    // スレッドから文脈を取得
+    let threadContext = "";
+    let threadSubject = "";
+    try {
+      const thread = await getThread(threadId, userId);
+      if (thread.length > 0) {
+        const original = thread[0];
+        if (original?.body) threadContext = `\n\n\u9001\u4FE1\u3057\u305F\u5185\u5BB9\u306E\u8981\u7D04:\n${original.body.slice(0, 300)}`;
+        if (!cleanSubject && original?.subject) threadSubject = original.subject.replace(/^Re:\s*/i, "").trim();
+      }
+    } catch { /* ignore */ }
+
+    const finalSubject = cleanSubject || threadSubject || "\u5148\u65E5\u306E\u3054\u9023\u7D61";
 
     const Anthropic = (await import("@anthropic-ai/sdk")).default;
     const client = new Anthropic();
@@ -255,7 +284,7 @@ dashboard.post("/dashboard/generate-reminder", async (c) => {
       max_tokens: 512,
       messages: [{
         role: "user",
-        content: `\u4EE5\u4E0B\u306E\u4EF6\u306B\u3064\u3044\u3066\u30D5\u30A9\u30ED\u30FC\u30A2\u30C3\u30D7\u30E1\u30FC\u30EB\u3092\u4F5C\u6210\u3057\u3066\u304F\u3060\u3055\u3044\u3002\n\n\u9001\u4FE1\u5148: ${toName}\n\u4EF6\u540D: ${subject}\n\n\u3010\u4F5C\u6210\u30EB\u30FC\u30EB\u3011\n- \u5192\u982D\u306F\u5FC5\u305A\u300C${toName}\u69D8\u300D\u3067\u59CB\u3081\u308B\n- \u300C\u50AC\u4FC3\u300D\u300C\u30EA\u30DE\u30A4\u30F3\u30C9\u300D\u300C\u518D\u9001\u300D\u300C\u78BA\u8A8D\u306E\u3054\u9023\u7D61\u300D\u306A\u3069\u306E\u76F4\u63A5\u7684\u306A\u8A00\u8449\u306F\u7D76\u5BFE\u306B\u4F7F\u308F\u306A\u3044\n- \u300C\u304A\u5FD9\u3057\u3044\u3068\u3053\u308D\u6050\u308C\u5165\u308A\u307E\u3059\u304C\u300D\u300C\u3054\u78BA\u8A8D\u3044\u305F\u3060\u3051\u307E\u3059\u3068\u5E78\u3044\u3067\u3059\u300D\u7B49\u306E\u914D\u616E\u8868\u73FE\u3092\u4F7F\u3046\n- \u300C\u5148\u65E5\u3054\u9023\u7D61\u3057\u305F\u3007\u3007\u306E\u4EF6\u3067\u3059\u304C\u300D\u306A\u3069\u81EA\u7136\u306A\u66F8\u304D\u51FA\u3057\u306B\u3059\u308B\n- \u76F8\u624B\u3092\u8CAC\u3081\u305F\u308A\u6025\u304B\u3059\u8868\u73FE\u306F\u4E00\u5207\u4F7F\u308F\u306A\u3044\n- \u7C21\u6F54\u306B2\u301C3\u6587\u7A0B\u5EA6\n- \u7F72\u540D\u306F\u542B\u3081\u306A\u3044\n- \u30E1\u30FC\u30EB\u672C\u6587\u306E\u307F\u3092\u51FA\u529B`,
+        content: `\u4EE5\u4E0B\u306E\u4EF6\u306B\u3064\u3044\u3066\u30D5\u30A9\u30ED\u30FC\u30A2\u30C3\u30D7\u30E1\u30FC\u30EB\u3092\u4F5C\u6210\u3057\u3066\u304F\u3060\u3055\u3044\u3002\n\n\u9001\u4FE1\u5148: ${finalToName}\u69D8\n\u4EF6\u540D\uFF08\u306E\u4EF6\uFF09: ${finalSubject}${threadContext}\n\n\u3010\u4F5C\u6210\u30EB\u30FC\u30EB\u3011\n- \u5192\u982D\u306F\u5FC5\u305A\u300C${finalToName}\u69D8\u300D\u3067\u59CB\u3081\u308B\n- \u300C\u5148\u65E5${finalSubject ? `\u300C${finalSubject}\u300D\u306E\u4EF6` : "\u3054\u9023\u7D61\u3057\u305F\u4EF6"}\u3067\u3059\u304C\u300D\u306E\u3088\u3046\u306A\u81EA\u7136\u306A\u66F8\u304D\u51FA\u3057\u306B\u3059\u308B\n- \u300C\u50AC\u4FC3\u300D\u300C\u30EA\u30DE\u30A4\u30F3\u30C9\u300D\u300C\u518D\u9001\u300D\u300C\u78BA\u8A8D\u306E\u3054\u9023\u7D61\u300D\u306A\u3069\u306E\u76F4\u63A5\u7684\u306A\u8A00\u8449\u306F\u7D76\u5BFE\u306B\u4F7F\u308F\u306A\u3044\n- \u300C\u304A\u5FD9\u3057\u3044\u3068\u3053\u308D\u6050\u308C\u5165\u308A\u307E\u3059\u304C\u300D\u300C\u3054\u78BA\u8A8D\u3044\u305F\u3060\u3051\u307E\u3059\u3068\u5E78\u3044\u3067\u3059\u300D\u7B49\u306E\u914D\u616E\u8868\u73FE\u3092\u4F7F\u3046\n- \u76F8\u624B\u3092\u8CAC\u3081\u305F\u308A\u6025\u304B\u3059\u8868\u73FE\u306F\u4E00\u5207\u4F7F\u308F\u306A\u3044\n- \u4EF6\u540D\u3084\u6587\u8108\u304C\u308F\u304B\u3089\u306A\u304F\u3066\u3082\u3001\u4E00\u822C\u7684\u306A\u4E01\u5BE7\u306A\u30D5\u30A9\u30ED\u30FC\u30A2\u30C3\u30D7\u6587\u3092\u4F5C\u6210\u3059\u308B\uFF08\u60C5\u5831\u3092\u805E\u304D\u8FD4\u3055\u306A\u3044\uFF09\n- \u7C21\u6F54\u306B2\u301C3\u6587\u7A0B\u5EA6\n- \u7F72\u540D\u306F\u542B\u3081\u306A\u3044\n- \u30E1\u30FC\u30EB\u672C\u6587\u306E\u307F\u3092\u51FA\u529B`,
       }],
     });
     const draft = msg.content[0]?.type === "text" ? msg.content[0].text : "";

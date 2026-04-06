@@ -732,11 +732,11 @@ async function proAgentLoop(userId: string, userText: string, plan: string): Pro
   }
 
   // 使用量チェック
-  const usageCheck = checkUsageLimit(userId, plan, "conversation");
+  const usageCheck = checkUsageLimit(userId, plan, "credit");
   if (!usageCheck.allowed) {
     const resetDate = getResetDate();
-    const limit = USAGE_LIMITS[plan]?.["conversation"] ?? 0;
-    return `\u4ECA\u6708\u306EAI\u5BFE\u8A71\u56DE\u6570\u306E\u4E0A\u9650\uFF08${limit}\u56DE\uFF09\u306B\u9054\u3057\u307E\u3057\u305F\u3002\n\n\u30EA\u30BB\u30C3\u30C8\u65E5\uFF1A${resetDate}\n\n\u30D7\u30ED\u30D7\u30E9\u30F3\u306B\u30A2\u30C3\u30D7\u30B0\u30EC\u30FC\u30C9\u3059\u308B\u3068300\u56DE/\u6708\u3054\u5229\u7528\u3044\u305F\u3060\u3051\u307E\u3059\u3002\n\uFF08\u6C7A\u6E08\u6A5F\u80FD\u306F\u8FD1\u65E5\u516C\u958B\u4E88\u5B9A\u3067\u3059\uFF09`;
+    const limit = USAGE_LIMITS[plan]?.["credit"] ?? 0;
+    return `\u4ECA\u6708\u306E\u30AF\u30EC\u30B8\u30C3\u30C8\u304C\u4E0A\u9650\uFF08${limit}\uFF09\u306B\u9054\u3057\u307E\u3057\u305F\u3002\n\n\u30EA\u30BB\u30C3\u30C8\u65E5\uFF1A${resetDate}\n\n\u30D7\u30ED\u30D7\u30E9\u30F3\u306B\u30A2\u30C3\u30D7\u30B0\u30EC\u30FC\u30C9\u3059\u308B\u3068300\u30AF\u30EC\u30B8\u30C3\u30C8/\u6708\u3054\u5229\u7528\u3044\u305F\u3060\u3051\u307E\u3059\u3002\n\uFF08\u6C7A\u6E08\u6A5F\u80FD\u306F\u8FD1\u65E5\u516C\u958B\u4E88\u5B9A\u3067\u3059\uFF09`;
   }
 
   // 会話履歴を取得
@@ -765,8 +765,8 @@ async function proAgentLoop(userId: string, userText: string, plan: string): Pro
       const textBlock = response.content.find((b) => b.type === "text");
       const reply = textBlock && "text" in textBlock ? textBlock.text : "\u3059\u307F\u307E\u305B\u3093\u3001\u3046\u307E\u304F\u51E6\u7406\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F\u3002";
       addConversation(userId, "assistant", reply);
-      logUsage(userId, "conversation");
-      checkAndNotifyUsageAlert(userId, plan, "conversation").catch(() => {});
+      logUsage(userId, "credit");
+      checkAndNotifyUsageAlert(userId, plan, "credit").catch(() => {});
       return reply;
     }
 
@@ -817,14 +817,14 @@ async function proAgentLoop(userId: string, userText: string, plan: string): Pro
     const textBlock = response.content.find((b) => b.type === "text");
     const reply = textBlock && "text" in textBlock ? textBlock.text : "\u51E6\u7406\u304C\u5B8C\u4E86\u3057\u307E\u3057\u305F\u3002";
     addConversation(userId, "assistant", reply);
-    logUsage(userId, "conversation");
-    checkAndNotifyUsageAlert(userId, plan, "conversation").catch(() => {});
+    logUsage(userId, "credit");
+    checkAndNotifyUsageAlert(userId, plan, "credit").catch(() => {});
     return reply;
   }
 
   const fallback = "\u51E6\u7406\u304C\u8907\u96D1\u3059\u304E\u308B\u305F\u3081\u3001\u3082\u3046\u5C11\u3057\u5177\u4F53\u7684\u306B\u304A\u9858\u3044\u3057\u307E\u3059\u3002";
   addConversation(userId, "assistant", fallback);
-  logUsage(userId, "conversation");
-  checkAndNotifyUsageAlert(userId, plan, "conversation").catch(() => {});
+  logUsage(userId, "credit");
+  checkAndNotifyUsageAlert(userId, plan, "credit").catch(() => {});
   return fallback;
 }

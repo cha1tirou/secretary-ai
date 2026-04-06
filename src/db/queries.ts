@@ -405,10 +405,10 @@ export function logUsage(userId: string, actionType: string): void {
 }
 
 export const USAGE_LIMITS: Record<string, Record<string, number>> = {
-  trial:   { ai_reply: 10,  conversation: 20 },
-  light:   { ai_reply: 30,  conversation: 60 },
-  pro:     { ai_reply: 150, conversation: 300 },
-  expired: { ai_reply: 0,   conversation: 0 },
+  trial:   { credit: 30 },
+  light:   { credit: 100 },
+  pro:     { credit: 300 },
+  expired: { credit: 0 },
 };
 
 export function checkUsageLimit(

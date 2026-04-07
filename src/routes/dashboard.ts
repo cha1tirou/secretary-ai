@@ -397,6 +397,24 @@ dashboard.post("/reply/skip", async (c) => {
   }
 });
 
+// ── Debug (temporary) ──
+
+dashboard.get("/debug/cache", (c) => {
+  const secret = c.req.query("s");
+  if (secret !== "dbg2026") return c.text("forbidden", 403);
+  const db = getDb();
+  const rows = db.prepare("SELECT message_id, category, cached_at FROM email_cache ORDER BY cached_at DESC LIMIT 20").all();
+  return c.json(rows);
+});
+
+dashboard.post("/debug/clear-cache", (c) => {
+  const secret = c.req.query("s");
+  if (secret !== "dbg2026") return c.text("forbidden", 403);
+  const db = getDb();
+  const result = db.prepare("DELETE FROM email_cache").run();
+  return c.json({ deleted: result.changes });
+});
+
 // ── Task Routes ──
 
 dashboard.get("/dashboard/tasks", (c) => {

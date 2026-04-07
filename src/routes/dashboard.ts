@@ -69,6 +69,14 @@ function isAutoSenderEmail(email: Email): boolean {
 
 type UnrepliedEmail = Email & { label: EmailLabel };
 
+function labelInfo(label: EmailLabel): { icon: string; text: string; color: string } | null {
+  if (label === "urgent") return { icon: "\u26A1", text: "\u6025\u304E", color: "#ef4444" };
+  if (label === "schedule") return { icon: "\uD83D\uDDD3", text: "\u65E5\u7A0B\u8ABF\u6574", color: "#3b82f6" };
+  if (label === "question") return { icon: "\u2753", text: "\u8CEA\u554F\u30FB\u78BA\u8A8D", color: "#f59e0b" };
+  if (label === "request") return { icon: "\uD83D\uDCCB", text: "\u4F9D\u983C\u30FB\u304A\u9858\u3044", color: "#f97316" };
+  return null;
+}
+
 function calcFreeSlotsForReply(events: CalendarEvent[]): string {
   const days = ["\u65E5", "\u6708", "\u706B", "\u6C34", "\u6728", "\u91D1", "\u571F"];
   const now = new Date();
@@ -190,6 +198,16 @@ dashboard.get("/dashboard", async (c) => {
   }
 });
 
+// ── GET /dashboard/reply-input ──
+dashboard.get("/dashboard/reply-input", (c) => {
+  const userId = getToken(c);
+  if (!userId) return c.text("token required", 401);
+  const from = c.req.query("from") ?? "";
+  const subject = c.req.query("subject") ?? "";
+  const threadId = c.req.query("threadId") ?? "";
+  return c.html(buildReplyInputHtml(userId, from, subject, threadId));
+});
+
 // ── POST /dashboard/generate-reply (Sonnet + \u30AB\u30EC\u30F3\u30C0\u30FC\u7D71\u5408) ──
 dashboard.post("/dashboard/generate-reply", async (c) => {
   const userId = getToken(c);
@@ -213,6 +231,7 @@ dashboard.post("/dashboard/generate-reply", async (c) => {
     const from = (body["from"] as string) ?? "";
     const subject = (body["subject"] as string) ?? "";
     const threadId = (body["threadId"] as string) ?? "";
+    const memo = ((body["memo"] as string) ?? "").trim();
 
     const thread = await getThread(threadId, userId);
     const threadText = thread.map((e) => e.subject + " " + e.body).join(" ");
@@ -231,12 +250,15 @@ dashboard.post("/dashboard/generate-reply", async (c) => {
 
     const Anthropic = (await import("@anthropic-ai/sdk")).default;
     const client = new Anthropic();
+    const promptContent = memo
+      ? `\u4EE5\u4E0B\u306E\u30E1\u30FC\u30EB\u30B9\u30EC\u30C3\u30C9\u3078\u306E\u8FD4\u4FE1\u6587\u3092\u4F5C\u6210\u3057\u3066\u304F\u3060\u3055\u3044\u3002\n\n\u9001\u4FE1\u8005: ${senderName}\n\u4EF6\u540D: ${subject}\n\n\u30E1\u30FC\u30EB\u30B9\u30EC\u30C3\u30C9:\n${thread.map((e) => `[${fmtFrom(e.from)}]\n${e.body.slice(0, 400)}`).join("\n\n")}${calendarContext}\n\n\u3010\u30E6\u30FC\u30B6\u30FC\u304C\u4F1D\u3048\u305F\u3044\u3053\u3068\uFF08\u3053\u308C\u3092\u5FC5\u305A\u53CD\u6620\uFF09\u3011\n${memo}\n\n\u3010\u4F5C\u6210\u30EB\u30FC\u30EB\u3011\n- \u5192\u982D\u306F\u5FC5\u305A\u300C${senderName}\u69D8\u300D\u3067\u59CB\u3081\u308B\n- \u30E6\u30FC\u30B6\u30FC\u304C\u4F1D\u3048\u305F\u3044\u3053\u3068\u3092\u4E01\u5BE7\u306A\u30D3\u30B8\u30CD\u30B9\u30E1\u30FC\u30EB\u306B\u5909\u63DB\u3059\u308B\n- \u4F1D\u3048\u305F\u3044\u3053\u3068\u306B\u306A\u3044\u5185\u5BB9\u3092\u52DD\u624B\u306B\u8FFD\u52A0\u3057\u306A\u3044\n- \u7F72\u540D\u306F\u542B\u3081\u306A\u3044\n- \u30E1\u30FC\u30EB\u672C\u6587\u306E\u307F\u3092\u51FA\u529B`
+      : `\u4EE5\u4E0B\u306E\u30E1\u30FC\u30EB\u30B9\u30EC\u30C3\u30C9\u3078\u306E\u8FD4\u4FE1\u6587\u3092\u4F5C\u6210\u3057\u3066\u304F\u3060\u3055\u3044\u3002\n\n\u9001\u4FE1\u8005: ${senderName}\n\u4EF6\u540D: ${subject}\n\n\u30E1\u30FC\u30EB\u30B9\u30EC\u30C3\u30C9:\n${thread.map((e) => `[${fmtFrom(e.from)}]\n${e.body.slice(0, 400)}`).join("\n\n")}${calendarContext}\n\n\u3010\u4F5C\u6210\u30EB\u30FC\u30EB\u3011\n- \u5192\u982D\u306F\u5FC5\u305A\u300C${senderName}\u69D8\u300D\u3067\u59CB\u3081\u308B\n- \u30D3\u30B8\u30CD\u30B9\u30E1\u30FC\u30EB\u3068\u3057\u3066\u9069\u5207\u306A\u6587\u4F53\n- \u7C21\u6F54\u3067\u8981\u70B9\u3092\u62BC\u3055\u3048\u305F\u5185\u5BB9\n- \u65E5\u7A0B\u8ABF\u6574\u306E\u5834\u5408\u306F\u5177\u4F53\u7684\u306A\u5019\u88DC\u65E5\u6642\u30923\u3064\u542B\u3081\u308B\n- \u7F72\u540D\u306F\u542B\u3081\u306A\u3044\n- \u30E1\u30FC\u30EB\u672C\u6587\u306E\u307F\u3092\u51FA\u529B`;
     const msg = await client.messages.create({
       model: "claude-sonnet-4-6",
       max_tokens: 1024,
       messages: [{
         role: "user",
-        content: `\u4EE5\u4E0B\u306E\u30E1\u30FC\u30EB\u30B9\u30EC\u30C3\u30C9\u3078\u306E\u8FD4\u4FE1\u6587\u3092\u4F5C\u6210\u3057\u3066\u304F\u3060\u3055\u3044\u3002\n\n\u9001\u4FE1\u8005: ${senderName}\n\u4EF6\u540D: ${subject}\n\n\u30E1\u30FC\u30EB\u30B9\u30EC\u30C3\u30C9:\n${thread.map((e) => `[${fmtFrom(e.from)}]\n${e.body.slice(0, 400)}`).join("\n\n")}${calendarContext}\n\n\u3010\u4F5C\u6210\u30EB\u30FC\u30EB\u3011\n- \u5192\u982D\u306F\u5FC5\u305A\u300C${senderName}\u69D8\u300D\u3067\u59CB\u3081\u308B\n- \u30D3\u30B8\u30CD\u30B9\u30E1\u30FC\u30EB\u3068\u3057\u3066\u9069\u5207\u306A\u6587\u4F53\n- \u7C21\u6F54\u3067\u8981\u70B9\u3092\u62BC\u3055\u3048\u305F\u5185\u5BB9\n- \u65E5\u7A0B\u8ABF\u6574\u306E\u5834\u5408\u306F\u5177\u4F53\u7684\u306A\u5019\u88DC\u65E5\u6642\u30923\u3064\u542B\u3081\u308B\n- \u300C\u50AC\u4FC3\u300D\u300C\u30EA\u30DE\u30A4\u30F3\u30C9\u300D\u306A\u3069\u306E\u8A00\u8449\u306F\u4F7F\u308F\u306A\u3044\n- \u7F72\u540D\u306F\u542B\u3081\u306A\u3044\n- \u30E1\u30FC\u30EB\u672C\u6587\u306E\u307F\u3092\u51FA\u529B`,
+        content: promptContent,
       }],
     });
     const draft = msg.content[0]?.type === "text" ? msg.content[0].text : "";
@@ -575,31 +597,20 @@ function buildDashboardHtml(
   const token = userId;
   const creditColor = creditUsage.remaining <= 10 ? "#ef4444" : "#6b7280";
 
-  const unrepliedCards = unrepliedEmails.slice(0, 10).map((e) => `
-    <div class="card">
+  const unrepliedCards = unrepliedEmails.slice(0, 15).map((e) => {
+    const info = labelInfo(e.label);
+    return `
+    <div class="card" id="card-${esc(e.id)}">
+      ${info ? `<div style="font-size:12px;font-weight:700;color:${info.color};margin-bottom:8px">${info.icon} ${info.text}</div>` : ""}
       <div class="card-from">${esc(fmtFrom(e.from))}</div>
-      <div class="card-subject">${esc(e.subject)}</div>
+      <div class="card-subject">${esc(e.subject || "(\u4EF6\u540D\u306A\u3057)")}</div>
       <div class="card-date">${esc(e.date)}</div>
       <div class="card-actions">
-        <form method="POST" action="/dashboard/generate-reply?token=${token}" style="display:inline">
-          <input type="hidden" name="from" value="${esc(e.from)}">
-          <input type="hidden" name="subject" value="${esc(e.subject)}">
-          <input type="hidden" name="threadId" value="${esc(e.threadId)}">
-          <button type="submit" class="btn-green">AI\u304C\u8FD4\u4FE1\u6848\u3092\u4F5C\u308B</button>
-        </form>
-        <button onclick="showMemo('${esc(e.id)}')" class="btn-gray">\u8981\u70B9\u3060\u3051\u4F1D\u3048\u3066AI\u304C\u6E05\u66F8</button>
+        <a href="/dashboard/reply-input?token=${token}&from=${encodeURIComponent(e.from)}&subject=${encodeURIComponent(e.subject ?? "")}&threadId=${encodeURIComponent(e.threadId)}" class="btn-green" style="text-decoration:none;display:inline-block">AI\u304C\u8FD4\u4FE1\u6848\u3092\u4F5C\u308B</a>
+        <button onclick="dismissEmail('${esc(e.id)}')" class="btn-dismiss">\u8FD4\u4FE1\u4E0D\u8981</button>
       </div>
-      <div id="memo-${esc(e.id)}" style="display:none;margin-top:12px">
-        <form method="POST" action="/dashboard/polish-reply?token=${token}">
-          <input type="hidden" name="from" value="${esc(e.from)}">
-          <input type="hidden" name="subject" value="${esc(e.subject)}">
-          <input type="hidden" name="threadId" value="${esc(e.threadId)}">
-          <p class="memo-hint">\u4F1D\u3048\u305F\u3044\u3053\u3068\u3092\u7B87\u6761\u66F8\u304D\u3067\u66F8\u3044\u3066\u304F\u3060\u3055\u3044\u3002AI\u304C\u4E01\u5BE7\u306A\u30E1\u30FC\u30EB\u306B\u4ED5\u4E0A\u3052\u307E\u3059\u3002</p>
-          <textarea name="memo" rows="4" class="memo-input" placeholder="\u30FB\u6765\u9031\u706B\u66DC\u3067OK&#10;\u30FB\u5834\u6240\u306F\u6E0B\u8C37\u5E0C\u671B&#10;\u30FB15\u6642\u4EE5\u964D\u306A\u3089\u7A7A\u3044\u3066\u308B"></textarea>
-          <button type="submit" class="btn-green" style="margin-top:8px">AI\u304C\u6E05\u66F8</button>
-        </form>
-      </div>
-    </div>`).join("");
+    </div>`;
+  }).join("");
 
   const awaitingCards = awaitingReply.slice(0, 5).map((e) => `
     <div class="card">
@@ -639,8 +650,7 @@ body { font-family:-apple-system,sans-serif; background:#f9fafb; min-height:100v
 .btn-green { background:#06C755; color:white; border:none; border-radius:8px; padding:8px 14px; font-size:13px; cursor:pointer; }
 .btn-gray { background:#f3f4f6; color:#374151; border:none; border-radius:8px; padding:8px 14px; font-size:13px; cursor:pointer; }
 .btn-amber { background:#f59e0b; color:white; border:none; border-radius:8px; padding:8px 14px; font-size:13px; cursor:pointer; }
-.memo-hint { font-size:13px; color:#6b7280; margin-bottom:8px; }
-.memo-input { width:100%; border:1px solid #e5e7eb; border-radius:8px; padding:8px; font-size:14px; box-sizing:border-box; }
+.btn-dismiss { background:none; color:#9ca3af; border:1px solid #e5e7eb; border-radius:8px; padding:8px 14px; font-size:13px; cursor:pointer; }
 .empty { color:#9ca3af; font-size:14px; padding:16px 0; }
 </style>
 </head>
@@ -652,7 +662,7 @@ body { font-family:-apple-system,sans-serif; background:#f9fafb; min-height:100v
 </div>
 <div class="container">
   <div class="tabs">
-    <div class="tab active" onclick="switchTab('reply')">\uD83D\uDCEC \u8981\u8FD4\u4FE1</div>
+    <div class="tab active" onclick="switchTab('reply')">\uD83D\uDCEC \u672A\u8FD4\u4FE1\uFF08${unrepliedEmails.length}\uFF09</div>
     <div class="tab" onclick="switchTab('awaiting')">\u23F3 \u8FD4\u4FE1\u5F85\u3061</div>
   </div>
   <div id="tab-reply" style="display:block">
@@ -670,9 +680,9 @@ function switchTab(name) {
   document.getElementById('tab-reply').style.display = name === 'reply' ? 'block' : 'none';
   document.getElementById('tab-awaiting').style.display = name === 'awaiting' ? 'block' : 'none';
 }
-function showMemo(id) {
-  var el = document.getElementById('memo-' + id);
-  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+function dismissEmail(id) {
+  var card = document.getElementById('card-' + id);
+  if (card) card.style.display = 'none';
 }
 </script>
 </body>
@@ -829,6 +839,53 @@ details summary { cursor:pointer; color:#6b7280; font-size:14px; font-weight:600
 function showEdit(id) { document.getElementById('view-'+id).style.display='none'; document.getElementById('edit-'+id).style.display='block'; }
 function hideEdit(id) { document.getElementById('view-'+id).style.display='block'; document.getElementById('edit-'+id).style.display='none'; }
 </script>
+</body>
+</html>`;
+}
+
+function buildReplyInputHtml(userId: string, from: string, subject: string, threadId: string): string {
+  const senderName = fmtFrom(from);
+  return `<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>\u8FD4\u4FE1\u3092\u4F5C\u6210</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,sans-serif; background:#f9fafb; }
+.header { background:#1a1a2e; color:white; padding:16px 20px; font-size:18px; font-weight:700; }
+.container { max-width:600px; margin:0 auto; padding:20px; }
+.info-card { background:white; border:1px solid #e5e7eb; border-radius:12px; padding:16px; margin-bottom:16px; }
+.label { font-size:13px; color:#6b7280; margin-bottom:2px; }
+.value { font-size:15px; color:#111; margin-bottom:12px; font-weight:500; }
+.section-title { font-size:15px; font-weight:700; margin-bottom:8px; color:#111; }
+.hint { font-size:13px; color:#6b7280; margin-bottom:12px; line-height:1.6; }
+textarea { width:100%; border:1px solid #e5e7eb; border-radius:8px; padding:12px; font-size:14px; line-height:1.7; box-sizing:border-box; resize:vertical; }
+.btn-primary { width:100%; background:#06C755; color:white; border:none; border-radius:12px; padding:16px; font-size:16px; font-weight:700; cursor:pointer; margin-top:12px; }
+.btn-back { width:100%; background:#f3f4f6; color:#374151; border:none; border-radius:12px; padding:14px; font-size:15px; cursor:pointer; margin-top:8px; }
+</style>
+</head>
+<body>
+<div class="header">\uD83E\uDD16 \u8FD4\u4FE1\u3092\u4F5C\u6210</div>
+<div class="container">
+  <div class="info-card">
+    <div class="label">\u5B9B\u5148</div>
+    <div class="value">${esc(senderName)}</div>
+    <div class="label">\u4EF6\u540D</div>
+    <div class="value">${esc(subject || "(\u4EF6\u540D\u306A\u3057)")}</div>
+  </div>
+  <div class="section-title">\u4F1D\u3048\u305F\u3044\u3053\u3068\u3092\u5165\u529B\uFF08\u4EFB\u610F\uFF09</div>
+  <div class="hint">\u7B87\u6761\u66F8\u304D\u3067OK\u3067\u3059\u3002\u7A7A\u767D\u306E\u307E\u307E\u3067\u3082AI\u304C\u81EA\u52D5\u3067\u8FD4\u4FE1\u6848\u3092\u4F5C\u308A\u307E\u3059\u3002<br>\u4F8B\uFF09\u30FB\u6765\u9031\u706B\u66DC\u306FOK \u30FB\u5834\u6240\u306F\u6E0B\u8C37\u5E0C\u671B \u30FB15\u6642\u4EE5\u964D\u306A\u3089\u7A7A\u3044\u3066\u308B</div>
+  <form method="POST" action="/dashboard/generate-reply?token=${userId}">
+    <input type="hidden" name="from" value="${esc(from)}">
+    <input type="hidden" name="subject" value="${esc(subject)}">
+    <input type="hidden" name="threadId" value="${esc(threadId)}">
+    <textarea name="memo" rows="6" placeholder="\u30FB\u6765\u9031\u706B\u66DC\u306FOK&#10;\u30FB\u5834\u6240\u306F\u6E0B\u8C37\u5E0C\u671B&#10;&#10;\uFF08\u7A7A\u767D\u306E\u307E\u307E\u3067\u3082AI\u304C\u81EA\u52D5\u751F\u6210\u3057\u307E\u3059\uFF09"></textarea>
+    <button type="submit" class="btn-primary">\u2728 \u8FD4\u4FE1\u6848\u3092\u4F5C\u308B</button>
+  </form>
+  <button class="btn-back" onclick="history.back()">\u2190 \u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9\u306B\u623B\u308B</button>
+</div>
 </body>
 </html>`;
 }

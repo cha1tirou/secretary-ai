@@ -56,19 +56,13 @@ app.post("/apply", async (c) => {
 
     createWaitlistEntry(name, email);
 
-    const adminUserId = process.env["ADMIN_LINE_USER_ID"];
-    if (adminUserId) {
-      const { messagingApi } = await import("@line/bot-sdk");
-      const client = new messagingApi.MessagingApiClient({
-        channelAccessToken: process.env["LINE_CHANNEL_ACCESS_TOKEN"] ?? "",
-      });
-      await client.pushMessage({
-        to: adminUserId,
-        messages: [{
-          type: "text",
-          text: `\uD83D\uDCDD \u65B0\u898F\u7533\u8FBC\u304C\u3042\u308A\u307E\u3057\u305F\n\n\u540D\u524D: ${name}\nEmail: ${email}\n\nGoogle Console\u306B\u30C6\u30B9\u30C8\u30E6\u30FC\u30B6\u30FC\u3068\u3057\u3066\u8FFD\u52A0\u5F8C\u3001\n\u300C\u627F\u8A8D ${email}\u300D\u3068\u9001\u3063\u3066\u304F\u3060\u3055\u3044\u3002`,
-        }],
-      }).catch((err: unknown) => console.error("[apply] LINE notify error:", err));
+    // \u7BA1\u7406\u8005\u30E1\u30FC\u30EB\u306B\u901A\u77E5
+    const adminEmail = process.env["ADMIN_EMAIL"];
+    if (adminEmail) {
+      const { sendAdminNotificationEmail } = await import("./integrations/gmail.js");
+      sendAdminNotificationEmail(adminEmail, name, email).catch((err: unknown) =>
+        console.error("[apply] email notify error:", err)
+      );
     }
 
     return c.json({ ok: true });

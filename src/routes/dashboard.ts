@@ -415,6 +415,46 @@ dashboard.post("/debug/clear-cache", (c) => {
   return c.json({ deleted: result.changes });
 });
 
+dashboard.get("/debug/emails", async (c) => {
+  const secret = c.req.query("s");
+  if (secret !== "dbg2026") return c.text("forbidden", 403);
+  const userId = c.req.query("uid") ?? "";
+  if (!userId) return c.text("uid required", 400);
+
+  try {
+    const emails = await getRecentEmails(userId, 14);
+    const accounts = getGoogleAccountsByUserId(userId);
+    const myEmails = accounts.map((a) => a.email).filter((e): e is string => e !== null);
+
+    const results = await Promise.all(emails.slice(0, 15).map(async (e) => {
+      const subjectClean = (e.subject ?? "").trim();
+      const isAutoSender = /no-?reply|noreply|newsletter|notifications?|donotreply|marketing|bounce/i.test(e.from);
+      let category = "SKIPPED";
+      let myReplyExists: boolean | null = null;
+
+      if (!(subjectClean === "" && isAutoSender) && !(subjectClean === "Re:" && isAutoSender)) {
+        category = await classifyEmailWithCache(e, userId, myEmails[0]).catch(() => "ERROR");
+        if (category === "reply_later" || category === "urgent_reply") {
+          myReplyExists = await checkMyReplyExists(e.threadId, userId, myEmails).catch(() => null as any);
+        }
+      }
+
+      return {
+        from: e.from.slice(0, 50),
+        subject: subjectClean.slice(0, 40) || "(\u306A\u3057)",
+        isAutoSender,
+        category,
+        myReplyExists,
+        date: e.date,
+      };
+    }));
+
+    return c.json({ myEmails, count: emails.length, results });
+  } catch (err) {
+    return c.json({ error: String(err) });
+  }
+});
+
 // ── Task Routes ──
 
 dashboard.get("/dashboard/tasks", (c) => {

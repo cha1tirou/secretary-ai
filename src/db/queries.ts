@@ -372,6 +372,26 @@ export function deleteTask(id: number): void {
     .run(id);
 }
 
+// ── Waitlist ──
+
+export function createWaitlistEntry(name: string, email: string): number {
+  const result = getDb().prepare("INSERT OR IGNORE INTO waitlist (name, email) VALUES (?, ?)").run(name, email);
+  return Number(result.lastInsertRowid);
+}
+
+export function getWaitlistPending(): { id: number; name: string; email: string; created_at: string }[] {
+  return getDb().prepare("SELECT id, name, email, created_at FROM waitlist WHERE status = 'pending' ORDER BY created_at ASC").all() as any[];
+}
+
+export function approveWaitlistByEmail(email: string): boolean {
+  const result = getDb().prepare("UPDATE waitlist SET status = 'approved' WHERE email = ? AND status = 'pending'").run(email);
+  return result.changes > 0;
+}
+
+export function getWaitlistByEmail(email: string): { id: number; name: string; email: string; status: string } | null {
+  return getDb().prepare("SELECT id, name, email, status FROM waitlist WHERE email = ?").get(email) as any ?? null;
+}
+
 // ── Email Cache ──
 
 export function getCachedEmailCategory(messageId: string, userId: string): string | null {

@@ -84,6 +84,15 @@ CREATE TABLE IF NOT EXISTS pending_replies (
   sent_at          DATETIME                            -- [PG] TIMESTAMPTZ
 );
 
+CREATE TABLE IF NOT EXISTS waitlist (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  name        TEXT NOT NULL,
+  email       TEXT NOT NULL UNIQUE,
+  status      TEXT DEFAULT 'pending' CHECK(status IN ('pending','approved','rejected')),
+  note        TEXT,
+  created_at  TEXT DEFAULT (datetime('now','localtime'))
+);
+
 CREATE TABLE IF NOT EXISTS email_cache (
   message_id  TEXT NOT NULL,
   user_id     TEXT NOT NULL,

@@ -285,24 +285,75 @@ footer{background:var(--ink);color:rgba(246,243,238,.3);text-align:center;paddin
   <div class="qr-inner">
     <p class="sl" style="text-align:center">はじめる</p>
     <h2 class="st">7日間、無料で試してみてください。</h2>
-    <p>現在α版（先行体験版）としてご提供中です。<br>フィードバックをいただきながらサービスを改善しています。<br>気に入らなければいつでもブロックできます。</p>
-    <div class="qr-layout">
-      <div class="qr-box">
-        <div class="qr-ph">
-          
-          <svg width="72" height="72" viewBox="0 0 80 80" fill="none"><rect x="5" y="5" width="28" height="28" rx="3" stroke="#2A5C3F" stroke-width="3" fill="none"/><rect x="13" y="13" width="12" height="12" rx="1" fill="#2A5C3F"/><rect x="47" y="5" width="28" height="28" rx="3" stroke="#2A5C3F" stroke-width="3" fill="none"/><rect x="55" y="13" width="12" height="12" rx="1" fill="#2A5C3F"/><rect x="5" y="47" width="28" height="28" rx="3" stroke="#2A5C3F" stroke-width="3" fill="none"/><rect x="13" y="55" width="12" height="12" rx="1" fill="#2A5C3F"/><rect x="47" y="47" width="8" height="8" rx="1" fill="#2A5C3F"/><rect x="59" y="47" width="8" height="8" rx="1" fill="#2A5C3F"/><rect x="47" y="59" width="8" height="8" rx="1" fill="#2A5C3F"/><rect x="59" y="59" width="8" height="8" rx="1" fill="#2A5C3F"/></svg>
-          <img src="https://qr-official.line.me/sid/L/210nulgd.png" alt="AI秘書 LINE QRコード" style="width:160px;height:160px;border-radius:8px;">
-        </div>
-        <span class="qr-lb">カメラで読み取る</span>
+    <p>現在α版（先行体験版）としてご提供中です。<br>フィードバックをいただきながらサービスを改善しています。</p>
+
+    <div style="max-width:480px;margin:0 auto;">
+      <div id="apply-form-wrap">
+        <p style="font-size:15px;color:#555;margin-bottom:24px;text-align:center;">
+          Gmailアドレスを登録すると、招待メールをお送りします。<br>
+          <span style="font-size:13px;color:#888;">現在α版のため、順次ご招待しています。</span>
+        </p>
+        <form id="apply-form" style="display:flex;flex-direction:column;gap:12px;">
+          <input type="text" id="apply-name" placeholder="お名前" required style="padding:14px 16px;border:1.5px solid #ddd;border-radius:10px;font-size:16px;outline:none;" />
+          <input type="email" id="apply-email" placeholder="Gmailアドレス（例: tanaka@gmail.com）" required style="padding:14px 16px;border:1.5px solid #ddd;border-radius:10px;font-size:16px;outline:none;" />
+          <button type="submit" id="apply-btn" style="background:#06C755;color:white;border:none;border-radius:10px;padding:16px;font-size:16px;font-weight:700;cursor:pointer;">無料体験に申し込む →</button>
+        </form>
+        <p id="apply-error" style="color:#e53e3e;font-size:13px;margin-top:8px;display:none;text-align:center;"></p>
+        <p style="font-size:12px;color:#aaa;margin-top:16px;text-align:center;">登録不要・クレジットカード不要・7日間無料</p>
       </div>
-      <span class="or">または</span>
-      <a href="https://line.me/R/ti/p/@210nulgd" class="btn-line" style="font-size:16px;padding:18px 36px">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63h2.386c.346 0 .627.285.627.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.105.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63.346 0 .628.285.628.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.281.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314"/></svg>
-        友達追加はこちら
-      </a>
+      <div id="apply-success" style="display:none;text-align:center;padding:32px 0;">
+        <p style="font-size:48px;margin-bottom:16px;">✅</p>
+        <p style="font-size:20px;font-weight:700;margin-bottom:8px;">申し込みを受け付けました！</p>
+        <p style="font-size:14px;color:#555;">
+          登録いただいたGmailアドレスに招待メールをお送りします。<br>
+          Google Consoleへの追加が完了次第（通常1〜2営業日）、<br>
+          メールにてご連絡します。
+        </p>
+      </div>
     </div>
   </div>
 </section>
+
+<script>
+document.getElementById('apply-form').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  var btn = document.getElementById('apply-btn');
+  var errEl = document.getElementById('apply-error');
+  btn.textContent = '送信中...';
+  btn.disabled = true;
+  errEl.style.display = 'none';
+  var name = document.getElementById('apply-name').value.trim();
+  var email = document.getElementById('apply-email').value.trim();
+  try {
+    var res = await fetch('/apply', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ name: name, email: email }),
+    });
+    var data = await res.json();
+    if (data.ok) {
+      document.getElementById('apply-form-wrap').style.display = 'none';
+      document.getElementById('apply-success').style.display = 'block';
+    } else if (data.error === 'already_approved') {
+      errEl.textContent = 'このアドレスはすでに承認済みです。招待メールをご確認ください。';
+      errEl.style.display = 'block';
+      btn.textContent = '無料体験に申し込む →'; btn.disabled = false;
+    } else if (data.error === 'already_registered') {
+      errEl.textContent = 'このアドレスはすでに登録済みです。招待メールをお待ちください。';
+      errEl.style.display = 'block';
+      btn.textContent = '無料体験に申し込む →'; btn.disabled = false;
+    } else {
+      errEl.textContent = data.error || 'エラーが発生しました。もう一度お試しください。';
+      errEl.style.display = 'block';
+      btn.textContent = '無料体験に申し込む →'; btn.disabled = false;
+    }
+  } catch(ex) {
+    errEl.textContent = '通信エラーが発生しました。もう一度お試しください。';
+    errEl.style.display = 'block';
+    btn.textContent = '無料体験に申し込む →'; btn.disabled = false;
+  }
+});
+</script>
 
 <footer>© 2026 AI秘書 &nbsp;|&nbsp; プライバシーポリシー &nbsp;|&nbsp; お問い合わせ</footer>
 

@@ -52,6 +52,7 @@ LINEで動くAI秘書。Gmail・Google Calendarと連携し、メール管理・
 | WEATHER_API_KEY | OpenWeatherMap API Key | （任意） |
 | WEATHER_CITY | 天気取得都市 | Tokyo |
 | BASE_URL | サービスURL | （GOOGLE_REDIRECT_URIから導出） |
+| ADMIN_LINE_USER_ID | 管理者のLINE userId（申込通知・管理コマンド用） | （任意） |
 
 ## 5. プランと料金
 

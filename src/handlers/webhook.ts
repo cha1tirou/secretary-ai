@@ -51,9 +51,11 @@ function buildWelcomeMessages(authUrl: string): { batch1: any[]; batch2: any[] }
       body: {
         type: "box", layout: "vertical", paddingAll: "20px", spacing: "lg",
         contents: [
-          featureRow("\uD83D\uDD14", "\u81EA\u52D5\u304A\u77E5\u3089\u305B", "\u5927\u4E8B\u306A\u3053\u3068\u3092\u5148\u56DE\u308A\u3057\u3066\u5C4A\u3051\u307E\u3059"),
-          featureRow("\uD83D\uDCEC", "\u30E1\u30FC\u30EB\u6574\u7406", "\u8FD4\u4FE1\u30FB\u50AC\u4FC3\u3092AI\u3068\u4E00\u7DD2\u306B\u7247\u4ED8\u3051\u308B"),
-          featureRow("\uD83D\uDCAC", "\u8A71\u3057\u304B\u3051\u308B\u3060\u3051", "\u30E1\u30FC\u30EB\u691C\u7D22\u304B\u3089\u4E88\u5B9A\u767B\u9332\u307E\u3067\u5373\u5BFE\u5FDC"),
+          { type: "text", text: "LINE\u306B\u8A71\u3057\u304B\u3051\u308B\u3060\u3051\u3067\u3001AI\u304C\u3042\u306A\u305F\u306E\u4EE3\u308F\u308A\u306B\u30E1\u30FC\u30EB\u30FB\u4E88\u5B9A\u30FB\u30BF\u30B9\u30AF\u3092\u5148\u56DE\u308A\u3057\u3066\u7BA1\u7406\u3057\u307E\u3059\u3002", size: "sm", color: "#555555", wrap: true },
+          featureRow("\uD83D\uDD14", "\u81EA\u52D5\u304A\u77E5\u3089\u305B", "\u671D\u30FB\u6627\u30FB\u591C\u306B\u30D6\u30EA\u30FC\u30D5\u30A3\u30F3\u30B0\u3092\u304A\u5C4A\u3051\u3002\u5929\u6C17\u30FB\u4E88\u5B9A\u30FB\u6C17\u306B\u306A\u308B\u3053\u3068\u30FB\u30BF\u30B9\u30AF\u3092\u78BA\u8A8D\u3002"),
+          featureRow("\uD83D\uDCEC", "\u30E1\u30FC\u30EB\u6574\u7406", "\u8FD4\u4FE1\u3059\u3079\u304D\u30E1\u30FC\u30EB\u3092\u30E9\u30D9\u30EB\u4ED8\u304D\u3067\u8868\u793A\u3002AI\u304C\u8FD4\u4FE1\u6587\u3092\u4E00\u7DD2\u306B\u4ED5\u4E0A\u3052\u307E\u3059\u3002"),
+          featureRow("\u2705", "\u30BF\u30B9\u30AF\u7BA1\u7406", "\u300C\u25CB\u25CB\u3092\u30BF\u30B9\u30AF\u306B\u8FFD\u52A0\u3057\u3066\u300D\u3068\u9001\u308B\u3060\u3051\u3002LINE\u3067\u8FFD\u52A0\u30FB\u78BA\u8A8D\u3067\u304D\u307E\u3059\u3002"),
+          featureRow("\uD83D\uDCAC", "\u8A71\u3057\u304B\u3051\u308B\u3060\u3051\u3067AI\u304C\u3084\u3063\u3066\u304F\u308C\u307E\u3059", "\u300C\u4ECA\u65E5\u306E\u4E88\u5B9A\u306F\uFF1F\u300D\u300C\u5C71\u7530\u3055\u3093\u304B\u3089\u30E1\u30FC\u30EB\u6765\u3066\u308B\uFF1F\u300D\u300C\u706B\u66DC\u5348\u5F8C3\u6642\u306BMTG\u5165\u308C\u3066\u300D\u300C\u7A7A\u304D\u6642\u9593\u3092\u6559\u3048\u3066\u300D\u306A\u3069\u4F55\u3067\u3082\u6C17\u8EFD\u306B\u3002"),
         ],
       },
       footer: {
@@ -87,44 +89,44 @@ function buildWelcomeMessages(authUrl: string): { batch1: any[]; batch2: any[] }
     },
   };
 
-  // ── 3通目: mailFlex（メール処理詳細） ──
+  // ── 3通目: mailFlex（メール整理） ──
   const mailFlex = {
     type: "flex",
-    altText: "\u30E1\u30FC\u30EB\u51E6\u7406 \u2014 AI\u304C\u304A\u624B\u4F1D\u3044",
+    altText: "\u30E1\u30FC\u30EB\u6574\u7406 \u2014 \u8FD4\u4FE1\u3092AI\u3068\u4E00\u7DD2\u306B\u7247\u4ED8\u3051\u308B",
     contents: {
       type: "bubble", size: "giga",
       header: {
         type: "box", layout: "vertical", backgroundColor: "#e67e22", paddingAll: "20px",
-        contents: [{ type: "text", text: "\uD83D\uDCEC \u30E1\u30FC\u30EB\u6574\u7406 \u2014 \u8FD4\u4FE1\u30FB\u50AC\u4FC3\u3092AI\u3068\u4E00\u7DD2\u306B\u7247\u4ED8\u3051\u308B", color: "#ffffff", weight: "bold", size: "md", wrap: true }],
+        contents: [{ type: "text", text: "\uD83D\uDCEC \u30E1\u30FC\u30EB\u6574\u7406 \u2014 \u8FD4\u4FE1\u3092AI\u3068\u4E00\u7DD2\u306B\u7247\u4ED8\u3051\u308B", color: "#ffffff", weight: "bold", size: "md", wrap: true }],
       },
       body: {
         type: "box", layout: "vertical", paddingAll: "20px", spacing: "md",
         contents: [
-          { type: "text", text: "\u8FD4\u4FE1\u3057\u305F\u65B9\u304C\u3044\u3044\u30E1\u30FC\u30EB\u3092\u4E26\u3079\u3066\u3001AI\u304C\u8FD4\u4FE1\u3092\u304A\u624B\u4F1D\u3044\u3057\u307E\u3059\u3002", size: "sm", color: "#555555", wrap: true },
-          { type: "text", text: "\u3010\u8FD4\u4FE1\u306E3\u629E\u3011\n\u2460 AI\u304C\u8FD4\u4FE1\u6848\u3092\u4F5C\u308B\n\u2461 \u8981\u70B9\u3092\u4F1D\u3048\u3066AI\u304C\u6E05\u66F8\u3059\u308B\n\u2462 \u5F8C\u3067\u5BFE\u5FDC\u3059\u308B", size: "sm", color: "#333333", wrap: true },
-          { type: "text", text: "\u9001\u4FE1\u3057\u305F\u306E\u306B\u8FD4\u4FE1\u304C\u6765\u3066\u3044\u306A\u3044\u30E1\u30FC\u30EB\u3082\u691C\u77E5\u3057\u3066\u300C\u50AC\u4FC3\u3057\u307E\u3057\u3087\u3046\u304B\uFF1F\u300D\u3068\u63D0\u6848\u3057\u307E\u3059\u3002", size: "xs", color: "#888888", wrap: true },
-          { type: "text", text: "\u51E6\u7406\u306F\u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9\u304B\u3089\uFF08Google\u8A8D\u8A3C\u5F8C\u306B\u500B\u4EBA\u7528URL\u3092\u304A\u9001\u308A\u3057\u307E\u3059\uFF09", size: "xs", color: "#aaaaaa", wrap: true },
+          { type: "text", text: "\u8FD4\u4FE1\u3059\u3079\u304D\u30E1\u30FC\u30EB\u3092\u30E9\u30D9\u30EB\u4ED8\u304D\u3067\u4E00\u89A7\u8868\u793A\u3057\u307E\u3059\u3002", size: "sm", color: "#555555", wrap: true },
+          { type: "text", text: "\u26A1 \u6025\u304E\u3000\uD83D\uDDD3 \u65E5\u7A0B\u8ABF\u6574\n\u2753 \u8CEA\u554F\u30FB\u78BA\u8A8D\u3000\uD83D\uDCCB \u4F9D\u983C\u30FB\u304A\u9858\u3044", size: "sm", color: "#333333", wrap: true },
+          { type: "text", text: "\u3010\u8FD4\u4FE1\u306E\u6D41\u308C\u3011\n\u2460 \u30E1\u30FC\u30EB\u306E\u5185\u5BB9\u3092\u78BA\u8A8D\n\u2461 \u4F1D\u3048\u305F\u3044\u3053\u3068\u3092\u7B87\u6761\u66F8\u304D\u5165\u529B\uFF08\u4EFB\u610F\uFF09\n\u2462 AI\u304C\u4E01\u5BE7\u306A\u30E1\u30FC\u30EB\u306B\u4ED5\u4E0A\u3052\u308B\n\u2463 \u78BA\u8A8D\u30FB\u7DE8\u96C6\u3057\u3066\u9001\u4FE1\n\n\u9001\u4FE1\u524D\u306B\u5FC5\u305A\u78BA\u8A8D\u753B\u9762\u304C\u3042\u308A\u307E\u3059\u3002\n\u8FD4\u4FE1\u6E08\u307F\u306B\u306A\u3063\u305F\u3089\u81EA\u52D5\u3067\u6D88\u3048\u307E\u3059\u3002", size: "sm", color: "#333333", wrap: true },
         ],
       },
     },
   };
 
-  // ── 4通目: pullFlex（Pull詳細） ──
-  const pullFlex = {
+  // ── 4通目: taskFlex（タスク管理） ──
+  const taskFlex = {
     type: "flex",
-    altText: "Pull \u2014 \u30E1\u30FC\u30EB\u30FB\u4E88\u5B9A\u3092\u67D4\u8EDF\u306B\u691C\u7D22\u30FB\u767B\u9332",
+    altText: "\u30BF\u30B9\u30AF\u7BA1\u7406 \u2014 LINE\u3067\u8FFD\u52A0\u30FB\u78BA\u8A8D",
     contents: {
       type: "bubble", size: "giga",
       header: {
-        type: "box", layout: "vertical", backgroundColor: "#8e44ad", paddingAll: "20px",
-        contents: [{ type: "text", text: "\uD83D\uDCAC \u8A71\u3057\u304B\u3051\u308B\u3060\u3051 \u2014 \u691C\u7D22\u30FB\u767B\u9332\u30FB\u78BA\u8A8D\u3092LINE\u3067\u5B8C\u7D50", color: "#ffffff", weight: "bold", size: "md", wrap: true }],
+        type: "box", layout: "vertical", backgroundColor: "#27ae60", paddingAll: "20px",
+        contents: [{ type: "text", text: "\u2705 \u30BF\u30B9\u30AF\u7BA1\u7406 \u2014 LINE\u3067\u8FFD\u52A0\u30FB\u78BA\u8A8D", color: "#ffffff", weight: "bold", size: "md", wrap: true }],
       },
       body: {
         type: "box", layout: "vertical", paddingAll: "20px", spacing: "md",
         contents: [
-          { type: "text", text: "LINE\u3067\u8A71\u3057\u304B\u3051\u308B\u3060\u3051\u3067\u3001\u30E1\u30FC\u30EB\u3084\u4E88\u5B9A\u3092\u3059\u3050\u306B\u691C\u7D22\u30FB\u64CD\u4F5C\u3067\u304D\u307E\u3059\u3002", size: "sm", color: "#555555", wrap: true },
-          { type: "text", text: "\u3010\u4F7F\u3044\u65B9\u4F8B\u3011\n\u30FB\u300C\u5C71\u7530\u3055\u3093\u304B\u3089\u30E1\u30FC\u30EB\u6765\u3066\u308B\uFF1F\u300D\u2192 \u5373\u691C\u7D22\n\u30FB\u300C\u6765\u9031\u306E\u7A7A\u304D\u6642\u9593\u3092\u6559\u3048\u3066\u300D\u2192 \u30AB\u30EC\u30F3\u30C0\u30FC\u3092\u78BA\u8A8D\n\u30FB\u300C\u706B\u66DC\u5348\u5F8C3\u6642\u306B\u9234\u6728\u3055\u3093\u3068MTG\u5165\u308C\u3066\u300D\u2192 \u81EA\u52D5\u767B\u9332\n\u30FB\u300C\u8FD4\u4FE1\u3059\u3079\u304D\u30E1\u30FC\u30EB\u3042\u308B\uFF1F\u300D\u2192 \u4E00\u89A7\u8868\u793A\n\u30FB\u300C\u30BF\u30B9\u30AF\u306B\u25CB\u25CB\u3092\u8FFD\u52A0\u3057\u3066\u300D\u2192 \u30BF\u30B9\u30AF\u30EA\u30B9\u30C8\u306B\u767B\u9332", size: "sm", color: "#333333", wrap: true },
-          { type: "text", text: "\u30E1\u30FC\u30EB\u691C\u7D22\u30FB\u65E5\u7A0B\u8ABF\u6574\u30FB\u30AB\u30EC\u30F3\u30C0\u30FC\u767B\u9332\u30FB\u30BF\u30B9\u30AF\u7BA1\u7406\u306A\u3069\u3001\u67D4\u8EDF\u306B\u5BFE\u5FDC\u3057\u307E\u3059\u3002", size: "xs", color: "#888888", wrap: true },
+          { type: "text", text: "\u3084\u308B\u3053\u3068\u3092LINE\u304B\u3089\u8FFD\u52A0\u3057\u3066\u3001Web\u3067\u7BA1\u7406\u3067\u304D\u307E\u3059\u3002", size: "sm", color: "#555555", wrap: true },
+          { type: "text", text: "\u3010LINE\u304B\u3089\u64CD\u4F5C\u3011\n\u30FB\u300C\u25CB\u25CB\u3092\u30BF\u30B9\u30AF\u306B\u8FFD\u52A0\u3057\u3066\u300D\u2192 \u81EA\u52D5\u767B\u9332\n\u30FB\u300C\u30BF\u30B9\u30AF\u898B\u305B\u3066\u300D\u2192 \u4E00\u89A7\u8868\u793A", size: "sm", color: "#333333", wrap: true },
+          { type: "text", text: "\u3010\u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9\u3067\u7BA1\u7406\u3011\n\u30FB\u8A73\u7D30\u78BA\u8A8D\u30FB\u7DE8\u96C6\u30FB\u5B8C\u4E86\u30FB\u524A\u9664", size: "sm", color: "#333333", wrap: true },
+          { type: "text", text: "\u671F\u65E5\u3082\u81EA\u7136\u306A\u8A00\u8449\u3067OK\uFF01\n\u4F8B\uFF09\u300C\u6765\u9031\u91D1\u66DC\u307E\u3067\u306B\u8CC7\u6599\u9001\u4ED8\u3092\u30BF\u30B9\u30AF\u306B\u8FFD\u52A0\u3057\u3066\u300D", size: "xs", color: "#888888", wrap: true },
         ],
       },
     },
@@ -167,7 +169,7 @@ function buildWelcomeMessages(authUrl: string): { batch1: any[]; batch2: any[] }
               { type: "box", layout: "vertical", width: "28px", height: "28px", backgroundColor: "#dddddd", cornerRadius: "14px", justifyContent: "center", alignItems: "center",
                 contents: [{ type: "text", text: "3", color: "#ffffff", size: "xs", weight: "bold", align: "center" }] },
               { type: "box", layout: "vertical", flex: 1,
-                contents: [{ type: "text", text: "STEP 3  \u300C\u4ECA\u65E5\u306E\u4E88\u5B9A\u306F\uFF1F\u300D\u3067\u958B\u59CB\uFF01", weight: "bold", size: "sm", color: "#aaaaaa" }] },
+                contents: [{ type: "text", text: "STEP 3  \u300C\u4ECA\u65E5\u306E\u4E88\u5B9A\u306F\uFF1F\u300D\u3084\u300C\u30BF\u30B9\u30AF\u898B\u305B\u3066\u300D\u3067\u958B\u59CB\uFF01", weight: "bold", size: "sm", color: "#aaaaaa" }] },
             ],
           },
           { type: "separator" },
@@ -195,6 +197,7 @@ function buildWelcomeMessages(authUrl: string): { batch1: any[]; batch2: any[] }
       "",
       "Trial\uFF087\u65E5\u9593\u7121\u6599\uFF09",
       "\u30FB30\u30AF\u30EC\u30B8\u30C3\u30C8\uFF087\u65E5\u9593\u9650\u5B9A\uFF09",
+      "\u30FB\u5168\u6A5F\u80FD\u3092\u304A\u8A66\u3057\u3044\u305F\u3060\u3051\u307E\u3059",
       "",
       "Light\uFF08\u6708480\u5186\uFF09",
       "\u30FB100\u30AF\u30EC\u30B8\u30C3\u30C8/\u6708",
@@ -203,7 +206,7 @@ function buildWelcomeMessages(authUrl: string): { batch1: any[]; batch2: any[] }
       "\u30FB300\u30AF\u30EC\u30B8\u30C3\u30C8/\u6708",
       "",
       "\u30AF\u30EC\u30B8\u30C3\u30C8\u306FAI\u8FD4\u4FE1\u751F\u6210\u30FBAI\u5BFE\u8A71\u306A\u3069\u306E",
-      "AI\u6A5F\u80FD\u3092\u4F7F\u7528\u3059\u308B\u3054\u3068\u306B\u6D88\u8CBB\u3055\u308C\u307E\u3059\u3002",
+      "AI\u6A5F\u80FD\u3092\u4F7F\u3046\u3054\u3068\u306B1\u6D88\u8CBB\u3055\u308C\u307E\u3059\u3002",
       "\u6BCE\u67081\u65E5\u306B\u30EA\u30BB\u30C3\u30C8\u3055\u308C\u307E\u3059\u3002",
       "",
       "\u26A0\uFE0F \u73FE\u5728\u03B1\u7248\u306E\u305F\u3081\u6C7A\u6E08\u6A5F\u80FD\u306F\u6E96\u5099\u4E2D\u3067\u3059\u3002",
@@ -215,7 +218,7 @@ function buildWelcomeMessages(authUrl: string): { batch1: any[]; batch2: any[] }
 
   return {
     batch1: [introFlex, pushFlex, mailFlex],
-    batch2: [pullFlex, setupFlex, notice],
+    batch2: [taskFlex, setupFlex, notice],
   };
 }
 

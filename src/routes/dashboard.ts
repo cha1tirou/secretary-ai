@@ -1,6 +1,5 @@
 import { Hono } from "hono";
 import { getRecentEmails, getSentEmails, checkThreadReplied, checkMyReplyExists, getThread, sendReply } from "../integrations/gmail.js";
-import { classifyEmailWithCache } from "../agents/classifier.js";
 import { getWeekEvents } from "../integrations/gcal.js";
 import {
   getDb,
@@ -41,10 +40,34 @@ function fmtFrom(from: string): string {
   return localPart.length > 20 ? localPart.slice(0, 20) + "..." : localPart;
 }
 
-function isMarketingDomain(email: string): boolean {
-  const domain = email.split("@")[1]?.toLowerCase() ?? "";
-  return /marketing|newsletter|email\.|mailer|bulk|bounce|campaign|promo/i.test(domain);
+type EmailLabel = "urgent" | "schedule" | "question" | "request" | null;
+
+function detectLabel(email: Email): EmailLabel {
+  const text = (email.subject ?? "") + " " + email.body.slice(0, 200);
+  if (/\u81F3\u6025|ASAP|\u6025\u304E|\u672C\u65E5\u4E2D|\u4ECA\u65E5\u4E2D|\u7DCA\u6025|urgent/i.test(text)) return "urgent";
+  if (/\u65E5\u7A0B|\u30B9\u30B1\u30B8\u30E5\u30FC\u30EB|MTG|\u6253\u3061\u5408\u308F\u305B|\u30DF\u30FC\u30C6\u30A3\u30F3\u30B0|\u5019\u88DC\u65E5|\u90FD\u5408|\u7A7A\u304D/.test(text)) return "schedule";
+  if (/\u3044\u304B\u304C\u3067\u3057\u3087\u3046\u304B|\u6559\u3048\u3066\u304F\u3060\u3055\u3044|\u3054\u78BA\u8A8D|\u3054\u610F\u898B|\u3069\u3046\u3067\u3057\u3087\u3046|\u304A\u805E\u304D\u3057\u305F\u3044|\u4F3A\u3044\u305F\u3044/.test(text)) return "question";
+  if (/\u304A\u9858\u3044|\u4F9D\u983C|\u3057\u3066\u3044\u305F\u3060|\u3057\u3066\u304F\u3060\u3055\u3044|\u304A\u9001\u308A|\u63D0\u51FA|\u3054\u5BFE\u5FDC/.test(text)) return "request";
+  return null;
 }
+
+function labelPriority(label: EmailLabel): number {
+  if (label === "urgent") return 0;
+  if (label === "schedule") return 1;
+  if (label === "question") return 2;
+  if (label === "request") return 3;
+  return 4;
+}
+
+function isAutoSenderEmail(email: Email): boolean {
+  if (/no-?reply|noreply|newsletter|notifications?|donotreply|marketing|bounce|automail|auto@/i.test(email.from)) return true;
+  if (email.listUnsubscribe || email.listId) return true;
+  const domain = email.from.split("@")[1]?.toLowerCase() ?? "";
+  if (/marketing|newsletter|email\.|mailer|bulk|bounce|campaign|promo/i.test(domain)) return true;
+  return false;
+}
+
+type UnrepliedEmail = Email & { label: EmailLabel };
 
 function calcFreeSlotsForReply(events: CalendarEvent[]): string {
   const days = ["\u65E5", "\u6708", "\u706B", "\u6C34", "\u6728", "\u91D1", "\u571F"];
@@ -101,23 +124,20 @@ dashboard.get("/dashboard", async (c) => {
       </body></html>`);
     }
 
-    // \u8981\u8FD4\u4FE1\u30E1\u30FC\u30EB: \u53D7\u4FE1\u7BB214\u65E5\u5206\u3092\u5206\u985E\u3057\u3066\u30D5\u30A3\u30EB\u30BF
+    // \u8981\u8FD4\u4FE1\u30E1\u30FC\u30EB: \u30EB\u30FC\u30EB\u30D9\u30FC\u30B9\u3067\u30D5\u30A3\u30EB\u30BF\uFF08Haiku\u4E0D\u4F7F\u7528\uFF09
     const recentEmails = await getRecentEmails(userId, 14).catch(() => [] as Email[]);
     const myEmails = accounts.map((a) => a.email).filter((e): e is string => e !== null);
 
-    const unrepliedEmails: Email[] = [];
+    const unrepliedEmails: UnrepliedEmail[] = [];
     for (const email of recentEmails) {
-      if (unrepliedEmails.length >= 10) break;
-      const subjectClean = (email.subject ?? "").trim();
-      const isAutoSender = /no-?reply|noreply|newsletter|notifications?|donotreply|marketing|bounce/i.test(email.from);
-      if (subjectClean === "" && isAutoSender) continue;
-      if (subjectClean === "Re:" && isAutoSender) continue;
-      const category = await classifyEmailWithCache(email, userId, myEmails[0]).catch(() => "fyi" as const);
-      if (category !== "reply_later" && category !== "urgent_reply") continue;
+      if (unrepliedEmails.length >= 15) break;
+      if (isAutoSenderEmail(email)) continue;
       const myReplyExists = await checkMyReplyExists(email.threadId, userId, myEmails).catch(() => false);
       if (myReplyExists) continue;
-      unrepliedEmails.push(email);
+      const label = detectLabel(email);
+      unrepliedEmails.push({ ...email, label });
     }
+    unrepliedEmails.sort((a, b) => labelPriority(a.label) - labelPriority(b.label));
 
     // \u8FD4\u4FE1\u5F85\u3061\u30E1\u30FC\u30EB
     const sent = await getSentEmails(userId, 30).catch(() => [] as Email[]);
@@ -142,7 +162,8 @@ dashboard.get("/dashboard", async (c) => {
         if (otherRecipients.length === 0) continue;
 
         const recipientAddress = otherRecipients[0] ?? email.to;
-        if (SKIP_TO_PATTERNS.test(recipientAddress) || isMarketingDomain(recipientAddress)) continue;
+        const recipientDomain = recipientAddress.split("@")[1]?.toLowerCase() ?? "";
+        if (SKIP_TO_PATTERNS.test(recipientAddress) || /marketing|newsletter|email\.|mailer|bulk|bounce|campaign|promo/i.test(recipientDomain)) continue;
 
         const recipientName = fmtFrom(recipientAddress);
 
@@ -427,24 +448,18 @@ dashboard.get("/debug/emails", async (c) => {
     const myEmails = accounts.map((a) => a.email).filter((e): e is string => e !== null);
 
     const results = await Promise.all(emails.slice(0, 15).map(async (e) => {
-      const subjectClean = (e.subject ?? "").trim();
-      const isAutoSender = /no-?reply|noreply|newsletter|notifications?|donotreply|marketing|bounce/i.test(e.from);
-      let category = "SKIPPED";
-      let myReplyExists: boolean | null = null;
-
-      if (!(subjectClean === "" && isAutoSender) && !(subjectClean === "Re:" && isAutoSender)) {
-        category = await classifyEmailWithCache(e, userId, myEmails[0]).catch(() => "ERROR");
-        if (category === "reply_later" || category === "urgent_reply") {
-          myReplyExists = await checkMyReplyExists(e.threadId, userId, myEmails).catch(() => null as any);
-        }
+      const auto = isAutoSenderEmail(e);
+      const label = auto ? null : detectLabel(e);
+      let myReply: boolean | null = null;
+      if (!auto) {
+        myReply = await checkMyReplyExists(e.threadId, userId, myEmails).catch(() => null as any);
       }
-
       return {
         from: e.from.slice(0, 50),
-        subject: subjectClean.slice(0, 40) || "(\u306A\u3057)",
-        isAutoSender,
-        category,
-        myReplyExists,
+        subject: (e.subject ?? "").slice(0, 40) || "(\u306A\u3057)",
+        isAutoSender: auto,
+        label,
+        myReplyExists: myReply,
         date: e.date,
       };
     }));
@@ -552,7 +567,7 @@ dashboard.post("/dashboard/tasks/delete", async (c) => {
 
 function buildDashboardHtml(
   userId: string,
-  unrepliedEmails: Email[],
+  unrepliedEmails: UnrepliedEmail[],
   awaitingReply: AwaitingEmail[],
   creditUsage: { remaining: number; limit: number },
   resetDate: string,

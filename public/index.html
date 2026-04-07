@@ -293,11 +293,10 @@ footer{background:var(--ink);color:rgba(246,243,238,.3);text-align:center;paddin
           Gmailアドレスを登録すると、招待メールをお送りします。<br>
           <span style="font-size:13px;color:#888;">現在α版のため、順次ご招待しています。</span>
         </p>
-        <form action="https://formspree.io/f/mvzvlnop" method="POST" style="display:flex;flex-direction:column;gap:12px;">
+        <form id="apply-form" action="https://formspree.io/f/mvzvlnop" method="POST" style="display:flex;flex-direction:column;gap:12px;">
           <input type="text" name="name" placeholder="お名前" required style="padding:14px 16px;border:1.5px solid #ddd;border-radius:10px;font-size:16px;outline:none;box-sizing:border-box;" />
           <input type="email" name="email" placeholder="Gmailアドレス（例: tanaka@gmail.com）" required style="padding:14px 16px;border:1.5px solid #ddd;border-radius:10px;font-size:16px;outline:none;box-sizing:border-box;" />
           <input type="hidden" name="_subject" value="【AI秘書】新規申込がありました">
-          <input type="hidden" name="_next" value="https://web-production-b2798.up.railway.app/?thanks=1">
           <button type="submit" style="background:#06C755;color:white;border:none;border-radius:10px;padding:16px;font-size:16px;font-weight:700;cursor:pointer;">無料体験に申し込む →</button>
         </form>
         <p style="font-size:12px;color:#aaa;margin-top:16px;text-align:center;">登録不要・クレジットカード不要・7日間無料</p>
@@ -307,16 +306,22 @@ footer{background:var(--ink);color:rgba(246,243,238,.3);text-align:center;paddin
 </section>
 
 <script>
-if (new URLSearchParams(window.location.search).get('thanks') === '1') {
+var af = document.getElementById('apply-form');
+if (af) af.addEventListener('submit', function() { sessionStorage.setItem('applied', '1'); });
+if (
+  new URLSearchParams(window.location.search).get('thanks') === '1' ||
+  sessionStorage.getItem('applied') === '1'
+) {
+  sessionStorage.removeItem('applied');
   var wrap = document.getElementById('apply-form-wrap');
   if (wrap) {
     wrap.innerHTML = '<div style="text-align:center;padding:32px 0;">' +
-      '<p style="font-size:48px;margin-bottom:16px;">✅</p>' +
-      '<p style="font-size:20px;font-weight:700;margin-bottom:8px;">申し込みを受け付けました！</p>' +
-      '<p style="font-size:14px;color:#555;">' +
-      '登録いただいたGmailアドレスに招待メールをお送りします。<br>' +
-      'Google Consoleへの追加が完了次第（通常1〜2営業日）、<br>' +
-      'メールにてご連絡します。</p></div>';
+      '<p style="font-size:48px;margin-bottom:16px;">\u2705</p>' +
+      '<p style="font-size:20px;font-weight:700;margin-bottom:8px;">\u7533\u3057\u8FBC\u307F\u3092\u53D7\u3051\u4ED8\u3051\u307E\u3057\u305F\uFF01</p>' +
+      '<p style="font-size:14px;color:#555;line-height:1.8;">' +
+      '\u767B\u9332\u3044\u305F\u3060\u3044\u305FGmail\u30A2\u30C9\u30EC\u30B9\u306B\u62DB\u5F85\u30E1\u30FC\u30EB\u3092\u304A\u9001\u308A\u3057\u307E\u3059\u3002<br>' +
+      'Google Console\u3078\u306E\u8FFD\u52A0\u304C\u5B8C\u4E86\u6B21\u7B2C\uFF08\u901A\u5E381\u301C2\u55B6\u696D\u65E5\uFF09\u3001<br>' +
+      '\u30E1\u30FC\u30EB\u306B\u3066\u3054\u9023\u7D61\u3057\u307E\u3059\u3002</p></div>';
   }
 }
 </script>

@@ -1,4 +1,5 @@
 import { google } from "googleapis";
+import nodemailer from "nodemailer";
 import { getAuthedClient, ReauthRequiredError } from "./auth.js";
 import { GoogleApiError } from "./errors.js";
 import { getGoogleAccountsByUserId } from "../db/queries.js";
@@ -535,51 +536,39 @@ export async function sendAdminNotificationEmail(
   applicantName: string,
   applicantEmail: string,
 ): Promise<void> {
-  const adminUserId = process.env["ADMIN_LINE_USER_ID"] ?? "";
-  if (!adminUserId) throw new Error("ADMIN_LINE_USER_ID not set");
+  const gmailUser = process.env["GMAIL_SMTP_USER"];
+  const gmailPass = process.env["GMAIL_SMTP_PASS"];
 
-  const accounts = getGoogleAccountsByUserId(adminUserId);
-  if (accounts.length === 0) throw new Error("Admin Google account not found");
+  if (!gmailUser || !gmailPass) {
+    console.error("[apply] GMAIL_SMTP_USER or GMAIL_SMTP_PASS not set");
+    return;
+  }
 
-  const subject = "\u3010AI\u79D8\u66F8\u3011\u65B0\u898F\u7533\u8FBC\u304C\u3042\u308A\u307E\u3057\u305F";
-  const bodyText = [
-    "\u65B0\u898F\u7533\u8FBC\u304C\u3042\u308A\u307E\u3057\u305F\u3002",
-    "",
-    `\u540D\u524D: ${applicantName}`,
-    `Email: ${applicantEmail}`,
-    "",
-    "\u2501\u2501 \u5BFE\u5FDC\u624B\u9806 \u2501\u2501",
-    "1. Google Console\u306B\u30C6\u30B9\u30C8\u30E6\u30FC\u30B6\u30FC\u3068\u3057\u3066\u8FFD\u52A0",
-    "   https://console.cloud.google.com/",
-    "",
-    `2. AI\u79D8\u66F8LINE\u306B\u300C\u627F\u8A8D ${applicantEmail}\u300D\u3068\u9001\u4FE1`,
-    "   \u2192 \u62DB\u5F85\u30E1\u30FC\u30EB\u304C\u81EA\u52D5\u9001\u4FE1\u3055\u308C\u307E\u3059",
-  ].join("\n");
-
-  const message = [
-    `To: ${adminEmail}`,
-    `Subject: =?UTF-8?B?${Buffer.from(subject).toString("base64")}?=`,
-    "Content-Type: text/plain; charset=UTF-8",
-    "Content-Transfer-Encoding: base64",
-    "",
-    Buffer.from(bodyText).toString("base64"),
-  ].join("\r\n");
-
-  const encoded = Buffer.from(message)
-    .toString("base64")
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
-
-  const auth = await getAuthedClient(adminUserId, "gmailToken", accounts[0]);
-  const gmail = google.gmail({ version: "v1", auth });
-
-  const res = await gmail.users.messages.send({
-    userId: "me",
-    requestBody: { raw: encoded },
+  const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: { user: gmailUser, pass: gmailPass },
   });
 
-  if (!res.data.id) throw new Error("Gmail notify send returned no id");
+  await transporter.sendMail({
+    from: `"AI\u79D8\u66F8" <${gmailUser}>`,
+    to: adminEmail,
+    subject: "\u3010AI\u79D8\u66F8\u3011\u65B0\u898F\u7533\u8FBC\u304C\u3042\u308A\u307E\u3057\u305F",
+    text: [
+      "\u65B0\u898F\u7533\u8FBC\u304C\u3042\u308A\u307E\u3057\u305F\u3002",
+      "",
+      `\u540D\u524D: ${applicantName}`,
+      `Email: ${applicantEmail}`,
+      "",
+      "\u2501\u2501 \u5BFE\u5FDC\u624B\u9806 \u2501\u2501",
+      "1. Google Console\u306B\u30C6\u30B9\u30C8\u30E6\u30FC\u30B6\u30FC\u3068\u3057\u3066\u8FFD\u52A0",
+      "   https://console.cloud.google.com/",
+      "",
+      `2. AI\u79D8\u66F8LINE\u306B\u300C\u627F\u8A8D ${applicantEmail}\u300D\u3068\u9001\u4FE1`,
+      "   \u2192 \u62DB\u5F85\u30E1\u30FC\u30EB\u304C\u81EA\u52D5\u9001\u4FE1\u3055\u308C\u307E\u3059",
+    ].join("\n"),
+  });
+
+  console.log(`[apply] admin notification sent to ${adminEmail}`);
 }
 
 export async function sendInviteEmail(

@@ -54,6 +54,8 @@ LINEで動くAI秘書。Gmail・Google Calendarと連携し、メール管理・
 | BASE_URL | サービスURL | （GOOGLE_REDIRECT_URIから導出） |
 | ADMIN_LINE_USER_ID | 管理者のLINE userId（管理コマンド・Gmail API用） | （任意） |
 | ADMIN_EMAIL | 管理者のメールアドレス（申込通知の受信先） | （任意） |
+| GMAIL_SMTP_USER | Gmail SMTPユーザー（申込通知・招待メール送信用） | （任意） |
+| GMAIL_SMTP_PASS | Gmailアプリパスワード（16桁） | （任意） |
 
 ## 5. プランと料金
 

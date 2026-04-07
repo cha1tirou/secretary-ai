@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { getTodayEvents, getTomorrowEvents } from "../integrations/gcal.js";
-import { getRecentEmails, getSentEmails, checkThreadReplied } from "../integrations/gmail.js";
+import { getRecentEmails, getSentEmails, checkThreadReplied, checkMyReplyExists } from "../integrations/gmail.js";
 import { getWeatherSummary, getTomorrowWeatherSummary } from "../integrations/weather.js";
 import { classifyEmailWithCache } from "./classifier.js";
 import { getGoogleAccountsByUserId, getTasks } from "../db/queries.js";
@@ -57,8 +57,8 @@ async function buildMorningContext(userId: string): Promise<MorningContext> {
     if (subjectClean === "" && isAutoSender) continue;
     const category = await classifyEmailWithCache(email, userId, myEmails[0]).catch(() => "fyi" as const);
     if (category !== "reply_later" && category !== "urgent_reply") continue;
-    const replied = await checkThreadReplied(email.threadId, userId, myEmails).catch(() => true);
-    if (replied) continue;
+    const myReplyExists = await checkMyReplyExists(email.threadId, userId, myEmails).catch(() => false);
+    if (myReplyExists) continue;
     const daysAgo = Math.floor((Date.now() - new Date(email.date).getTime()) / 86400000);
     needsReplyEmails.push({ from: fmtFrom(email.from), subject: email.subject, daysAgo });
   }
@@ -228,8 +228,8 @@ export async function generateNoonBriefing(userId: string): Promise<string> {
       if (noonSubject === "" && noonAutoSender) continue;
       const cat = await classifyEmailWithCache(email, userId, myEmails[0]).catch(() => "fyi" as const);
       if (cat !== "reply_later" && cat !== "urgent_reply") continue;
-      const replied = await checkThreadReplied(email.threadId, userId, myEmails).catch(() => true);
-      if (!replied) needsReplyCount++;
+      const myReply = await checkMyReplyExists(email.threadId, userId, myEmails).catch(() => false);
+      if (!myReply) needsReplyCount++;
     }
 
     if (needsReplyCount > 0) {
@@ -266,8 +266,8 @@ export async function generateEveningBriefing(userId: string): Promise<string> {
       if (eveSubject === "" && eveAutoSender) continue;
       const cat = await classifyEmailWithCache(email, userId, myEmails[0]).catch(() => "fyi" as const);
       if (cat !== "reply_later" && cat !== "urgent_reply") continue;
-      const replied = await checkThreadReplied(email.threadId, userId, myEmails).catch(() => true);
-      if (!replied) needsReplyCount++;
+      const myReply = await checkMyReplyExists(email.threadId, userId, myEmails).catch(() => false);
+      if (!myReply) needsReplyCount++;
     }
 
     let text = "\u304A\u75B2\u308C\u3055\u307E\u3067\u3057\u305F\u3002\n";

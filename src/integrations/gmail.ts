@@ -510,6 +510,26 @@ export async function checkThreadReplied(
   }
 }
 
+// 要返信メール用：スレッドに自分の返信があるかチェック
+// true = 自分が返信済み → ダッシュボードに表示しない
+// false = 未返信 → ダッシュボードに表示する
+export async function checkMyReplyExists(
+  threadId: string,
+  userId: string,
+  myEmails: string[],
+): Promise<boolean> {
+  try {
+    const thread = await getThread(threadId, userId);
+    const myAddrs = myEmails.map((e) => e.toLowerCase());
+    return thread.some((msg) => {
+      const from = msg.from.toLowerCase();
+      return myAddrs.some((a) => from.includes(a));
+    });
+  } catch {
+    return false; // エラー時は未返信扱い（表示する）
+  }
+}
+
 // ── 直接実行で動作確認 ──
 if (process.argv[1]?.endsWith("gmail.ts")) {
   const { initDb } = await import("../db/queries.js");

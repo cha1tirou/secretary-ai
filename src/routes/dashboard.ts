@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { getRecentEmails, getSentEmails, checkThreadReplied, getThread, sendReply } from "../integrations/gmail.js";
+import { getRecentEmails, getSentEmails, checkThreadReplied, checkMyReplyExists, getThread, sendReply } from "../integrations/gmail.js";
 import { classifyEmailWithCache } from "../agents/classifier.js";
 import { getWeekEvents } from "../integrations/gcal.js";
 import {
@@ -115,8 +115,8 @@ dashboard.get("/dashboard", async (c) => {
       if (isAutoSender) continue;
       const category = await classifyEmailWithCache(email, userId, myEmails[0]).catch(() => "fyi" as const);
       if (category !== "reply_later" && category !== "urgent_reply") continue;
-      const replied = await checkThreadReplied(email.threadId, userId, myEmails).catch(() => true);
-      if (replied) continue;
+      const myReplyExists = await checkMyReplyExists(email.threadId, userId, myEmails).catch(() => false);
+      if (myReplyExists) continue;
       unrepliedEmails.push(email);
     }
 

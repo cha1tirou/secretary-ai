@@ -293,66 +293,32 @@ footer{background:var(--ink);color:rgba(246,243,238,.3);text-align:center;paddin
           Gmailアドレスを登録すると、招待メールをお送りします。<br>
           <span style="font-size:13px;color:#888;">現在α版のため、順次ご招待しています。</span>
         </p>
-        <form id="apply-form" style="display:flex;flex-direction:column;gap:12px;">
-          <input type="text" id="apply-name" placeholder="お名前" required style="padding:14px 16px;border:1.5px solid #ddd;border-radius:10px;font-size:16px;outline:none;" />
-          <input type="email" id="apply-email" placeholder="Gmailアドレス（例: tanaka@gmail.com）" required style="padding:14px 16px;border:1.5px solid #ddd;border-radius:10px;font-size:16px;outline:none;" />
-          <button type="submit" id="apply-btn" style="background:#06C755;color:white;border:none;border-radius:10px;padding:16px;font-size:16px;font-weight:700;cursor:pointer;">無料体験に申し込む →</button>
+        <form action="https://formspree.io/f/mvzvlnop" method="POST" style="display:flex;flex-direction:column;gap:12px;">
+          <input type="text" name="name" placeholder="お名前" required style="padding:14px 16px;border:1.5px solid #ddd;border-radius:10px;font-size:16px;outline:none;box-sizing:border-box;" />
+          <input type="email" name="email" placeholder="Gmailアドレス（例: tanaka@gmail.com）" required style="padding:14px 16px;border:1.5px solid #ddd;border-radius:10px;font-size:16px;outline:none;box-sizing:border-box;" />
+          <input type="hidden" name="_subject" value="【AI秘書】新規申込がありました">
+          <input type="hidden" name="_next" value="https://web-production-b2798.up.railway.app/?thanks=1">
+          <button type="submit" style="background:#06C755;color:white;border:none;border-radius:10px;padding:16px;font-size:16px;font-weight:700;cursor:pointer;">無料体験に申し込む →</button>
         </form>
-        <p id="apply-error" style="color:#e53e3e;font-size:13px;margin-top:8px;display:none;text-align:center;"></p>
         <p style="font-size:12px;color:#aaa;margin-top:16px;text-align:center;">登録不要・クレジットカード不要・7日間無料</p>
-      </div>
-      <div id="apply-success" style="display:none;text-align:center;padding:32px 0;">
-        <p style="font-size:48px;margin-bottom:16px;">✅</p>
-        <p style="font-size:20px;font-weight:700;margin-bottom:8px;">申し込みを受け付けました！</p>
-        <p style="font-size:14px;color:#555;">
-          登録いただいたGmailアドレスに招待メールをお送りします。<br>
-          Google Consoleへの追加が完了次第（通常1〜2営業日）、<br>
-          メールにてご連絡します。
-        </p>
       </div>
     </div>
   </div>
 </section>
 
 <script>
-document.getElementById('apply-form').addEventListener('submit', async function(e) {
-  e.preventDefault();
-  var btn = document.getElementById('apply-btn');
-  var errEl = document.getElementById('apply-error');
-  btn.textContent = '送信中...';
-  btn.disabled = true;
-  errEl.style.display = 'none';
-  var name = document.getElementById('apply-name').value.trim();
-  var email = document.getElementById('apply-email').value.trim();
-  try {
-    var res = await fetch('/apply', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ name: name, email: email }),
-    });
-    var data = await res.json();
-    if (data.ok) {
-      document.getElementById('apply-form-wrap').style.display = 'none';
-      document.getElementById('apply-success').style.display = 'block';
-    } else if (data.error === 'already_approved') {
-      errEl.textContent = 'このアドレスはすでに承認済みです。招待メールをご確認ください。';
-      errEl.style.display = 'block';
-      btn.textContent = '無料体験に申し込む →'; btn.disabled = false;
-    } else if (data.error === 'already_registered') {
-      errEl.textContent = 'このアドレスはすでに登録済みです。招待メールをお待ちください。';
-      errEl.style.display = 'block';
-      btn.textContent = '無料体験に申し込む →'; btn.disabled = false;
-    } else {
-      errEl.textContent = data.error || 'エラーが発生しました。もう一度お試しください。';
-      errEl.style.display = 'block';
-      btn.textContent = '無料体験に申し込む →'; btn.disabled = false;
-    }
-  } catch(ex) {
-    errEl.textContent = '通信エラーが発生しました。もう一度お試しください。';
-    errEl.style.display = 'block';
-    btn.textContent = '無料体験に申し込む →'; btn.disabled = false;
+if (new URLSearchParams(window.location.search).get('thanks') === '1') {
+  var wrap = document.getElementById('apply-form-wrap');
+  if (wrap) {
+    wrap.innerHTML = '<div style="text-align:center;padding:32px 0;">' +
+      '<p style="font-size:48px;margin-bottom:16px;">✅</p>' +
+      '<p style="font-size:20px;font-weight:700;margin-bottom:8px;">申し込みを受け付けました！</p>' +
+      '<p style="font-size:14px;color:#555;">' +
+      '登録いただいたGmailアドレスに招待メールをお送りします。<br>' +
+      'Google Consoleへの追加が完了次第（通常1〜2営業日）、<br>' +
+      'メールにてご連絡します。</p></div>';
   }
-});
+}
 </script>
 
 <footer>© 2026 AI秘書 &nbsp;|&nbsp; プライバシーポリシー &nbsp;|&nbsp; お問い合わせ</footer>

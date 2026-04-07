@@ -110,12 +110,20 @@ dashboard.get("/dashboard", async (c) => {
       if (unrepliedEmails.length >= 10) break;
       const subjectClean = (email.subject ?? "").trim();
       const isAutoSender = /no-?reply|noreply|newsletter|notifications?|donotreply|marketing|bounce/i.test(email.from);
-      if (subjectClean === "" && isAutoSender) continue;
-      if (subjectClean === "Re:") continue;
-      if (isAutoSender) continue;
+
+      console.log(`[dashboard] email: from="${email.from}" subject="${subjectClean}" isAutoSender=${isAutoSender}`);
+
+      if (subjectClean === "" && isAutoSender) { console.log("[dashboard] skip: auto sender with no subject"); continue; }
+      if (subjectClean === "Re:") { console.log("[dashboard] skip: Re: only subject"); continue; }
+
       const category = await classifyEmailWithCache(email, userId, myEmails[0]).catch(() => "fyi" as const);
+      console.log(`[dashboard] classified: "${subjectClean}" \u2192 ${category}`);
+
       if (category !== "reply_later" && category !== "urgent_reply") continue;
+
       const myReplyExists = await checkMyReplyExists(email.threadId, userId, myEmails).catch(() => false);
+      console.log(`[dashboard] myReplyExists: ${myReplyExists}`);
+
       if (myReplyExists) continue;
       unrepliedEmails.push(email);
     }

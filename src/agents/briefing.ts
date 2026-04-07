@@ -23,6 +23,7 @@ function isAutoSender(email: Email): boolean {
   if (email.listUnsubscribe || email.listId) return true;
   if (email.precedence && /bulk|list|junk/i.test(email.precedence)) return true;
   if (/\u914D\u4FE1\u505C\u6B62|unsubscribe/i.test(email.body.slice(0, 300))) return true;
+  if (/\u81E8\u6642\u4FBF|\u30AD\u30E3\u30F3\u30DA\u30FC\u30F3|\u30BB\u30FC\u30EB|\u30AF\u30FC\u30DD\u30F3|\u30DD\u30A4\u30F3\u30C8|\u30D7\u30EC\u30BC\u30F3\u30C8|\u7279\u96C6|\u304A\u5F97|\u5272\u5F15|\u671F\u9593\u9650\u5B9A|\u3054\u6848\u5185|\u306E\u304A\u77E5\u3089\u305B/.test((email.subject ?? "").toLowerCase())) return true;
   return false;
 }
 

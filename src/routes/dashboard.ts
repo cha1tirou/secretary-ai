@@ -68,6 +68,8 @@ function isAutoSenderEmail(email: Email): boolean {
   const domain = email.from.split("@")[1]?.split(">")[0]?.toLowerCase() ?? "";
   if (/marketing|newsletter|email\.|mailer|bulk|bounce|campaign|promo|notify\.|notification/i.test(domain)) return true;
   if (/\u914D\u4FE1\u505C\u6B62|unsubscribe|\u30E1\u30FC\u30EB\u914D\u4FE1\u3092\u505C\u6B62|\u53D7\u4FE1\u62D2\u5426/i.test(email.body.slice(0, 500))) return true;
+  const subj = (email.subject ?? "").toLowerCase();
+  if (/\u81E8\u6642\u4FBF|\u30AD\u30E3\u30F3\u30DA\u30FC\u30F3|\u30BB\u30FC\u30EB|\u30AF\u30FC\u30DD\u30F3|\u30DD\u30A4\u30F3\u30C8|\u30D7\u30EC\u30BC\u30F3\u30C8|\u7279\u96C6|\u304A\u5F97|\u5272\u5F15|\u671F\u9593\u9650\u5B9A|\u3054\u6848\u5185|\u306E\u304A\u77E5\u3089\u305B/.test(subj)) return true;
   return false;
 }
 

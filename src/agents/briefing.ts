@@ -19,8 +19,10 @@ function fmtFrom(from: string): string {
 }
 
 function isAutoSender(email: Email): boolean {
-  if (/no-?reply|noreply|newsletter|notifications?|donotreply|marketing|bounce|automail/i.test(email.from)) return true;
+  if (/no-?reply|noreply|newsletter|notifications?|donotreply|marketing|bounce|automail|notify@|alert@|hello@|updates?@|news@/i.test(email.from)) return true;
   if (email.listUnsubscribe || email.listId) return true;
+  if (email.precedence && /bulk|list|junk/i.test(email.precedence)) return true;
+  if (/\u914D\u4FE1\u505C\u6B62|unsubscribe/i.test(email.body.slice(0, 300))) return true;
   return false;
 }
 

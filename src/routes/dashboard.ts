@@ -60,10 +60,12 @@ function labelPriority(label: EmailLabel): number {
 }
 
 function isAutoSenderEmail(email: Email): boolean {
-  if (/no-?reply|noreply|newsletter|notifications?|donotreply|marketing|bounce|automail|auto@/i.test(email.from)) return true;
+  if (/no-?reply|noreply|newsletter|notifications?|donotreply|marketing|bounce|automail|auto@|notify@|alert@|support@|info@|hello@|updates?@|news@/i.test(email.from)) return true;
   if (email.listUnsubscribe || email.listId) return true;
-  const domain = email.from.split("@")[1]?.toLowerCase() ?? "";
-  if (/marketing|newsletter|email\.|mailer|bulk|bounce|campaign|promo/i.test(domain)) return true;
+  if (email.precedence && /bulk|list|junk/i.test(email.precedence)) return true;
+  const domain = email.from.split("@")[1]?.split(">")[0]?.toLowerCase() ?? "";
+  if (/marketing|newsletter|email\.|mailer|bulk|bounce|campaign|promo|notify\.|notification/i.test(domain)) return true;
+  if (/\u914D\u4FE1\u505C\u6B62|unsubscribe|\u30E1\u30FC\u30EB\u914D\u4FE1\u3092\u505C\u6B62|\u53D7\u4FE1\u62D2\u5426/i.test(email.body.slice(0, 500))) return true;
   return false;
 }
 

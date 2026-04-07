@@ -55,6 +55,7 @@ async function buildMorningContext(userId: string): Promise<MorningContext> {
     const subjectClean = (email.subject ?? "").trim();
     const isAutoSender = /no-?reply|noreply|newsletter|notifications?|donotreply|marketing|bounce/i.test(email.from);
     if (subjectClean === "" && isAutoSender) continue;
+    if (subjectClean === "Re:" && isAutoSender) continue;
     const category = await classifyEmailWithCache(email, userId, myEmails[0]).catch(() => "fyi" as const);
     if (category !== "reply_later" && category !== "urgent_reply") continue;
     const myReplyExists = await checkMyReplyExists(email.threadId, userId, myEmails).catch(() => false);
@@ -226,6 +227,7 @@ export async function generateNoonBriefing(userId: string): Promise<string> {
       const noonSubject = (email.subject ?? "").trim();
       const noonAutoSender = /no-?reply|noreply|newsletter|notifications?|donotreply|marketing|bounce/i.test(email.from);
       if (noonSubject === "" && noonAutoSender) continue;
+      if (noonSubject === "Re:" && noonAutoSender) continue;
       const cat = await classifyEmailWithCache(email, userId, myEmails[0]).catch(() => "fyi" as const);
       if (cat !== "reply_later" && cat !== "urgent_reply") continue;
       const myReply = await checkMyReplyExists(email.threadId, userId, myEmails).catch(() => false);
@@ -264,6 +266,7 @@ export async function generateEveningBriefing(userId: string): Promise<string> {
       const eveSubject = (email.subject ?? "").trim();
       const eveAutoSender = /no-?reply|noreply|newsletter|notifications?|donotreply|marketing|bounce/i.test(email.from);
       if (eveSubject === "" && eveAutoSender) continue;
+      if (eveSubject === "Re:" && eveAutoSender) continue;
       const cat = await classifyEmailWithCache(email, userId, myEmails[0]).catch(() => "fyi" as const);
       if (cat !== "reply_later" && cat !== "urgent_reply") continue;
       const myReply = await checkMyReplyExists(email.threadId, userId, myEmails).catch(() => false);

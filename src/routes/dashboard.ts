@@ -15,6 +15,8 @@ import {
   getTasks,
   createTask,
   updateTaskStatus,
+  getCachedEmailCategory,
+  setCachedEmailCategory,
 } from "../db/queries.js";
 import { buildAuthUrl } from "../integrations/auth.js";
 import { checkAndNotifyUsageAlert } from "../utils/usage.js";
@@ -142,6 +144,8 @@ dashboard.get("/dashboard", async (c) => {
     for (const email of recentEmails) {
       if (unrepliedEmails.length >= 15) break;
       if (isAutoSenderEmail(email)) continue;
+      const cached = getCachedEmailCategory(email.id, userId);
+      if (cached === "dismissed") continue;
       const myReplyExists = await checkMyReplyExists(email.threadId, userId, myEmails).catch(() => false);
       if (myReplyExists) continue;
       const label = detectLabel(email);
@@ -442,6 +446,22 @@ dashboard.post("/reply/skip", async (c) => {
   }
 });
 
+// ── POST /dashboard/dismiss-email ──
+dashboard.post("/dashboard/dismiss-email", async (c) => {
+  const userId = getToken(c);
+  if (!userId) return c.text("token required", 401);
+  try {
+    const body = await c.req.parseBody();
+    const messageId = (body["messageId"] as string) ?? "";
+    if (!messageId) return c.text("messageId required", 400);
+    setCachedEmailCategory(messageId, userId, "dismissed");
+    return c.json({ ok: true });
+  } catch (err) {
+    console.error("[dashboard] dismiss error:", err);
+    return c.text("Internal Server Error", 500);
+  }
+});
+
 // ── Task Routes ──
 
 dashboard.get("/dashboard/tasks", (c) => {
@@ -557,7 +577,7 @@ function buildDashboardHtml(
       <div class="card-date">${esc(e.date)}</div>
       <div class="card-actions">
         <a href="/dashboard/reply-input?token=${token}&from=${encodeURIComponent(e.from)}&subject=${encodeURIComponent(e.subject ?? "")}&threadId=${encodeURIComponent(e.threadId)}" class="btn-green" style="text-decoration:none;display:inline-block">AI\u304C\u8FD4\u4FE1\u6848\u3092\u4F5C\u308B</a>
-        <button onclick="dismissEmail('${esc(e.id)}')" class="btn-dismiss">\u8FD4\u4FE1\u4E0D\u8981</button>
+        <button onclick="dismissEmail('${esc(e.id)}','${token}')" class="btn-dismiss">\u8FD4\u4FE1\u4E0D\u8981</button>
       </div>
     </div>`;
   }).join("");
@@ -630,9 +650,19 @@ function switchTab(name) {
   document.getElementById('tab-reply').style.display = name === 'reply' ? 'block' : 'none';
   document.getElementById('tab-awaiting').style.display = name === 'awaiting' ? 'block' : 'none';
 }
-function dismissEmail(id) {
+function dismissEmail(id, token) {
   var card = document.getElementById('card-' + id);
-  if (card) card.style.display = 'none';
+  if (card) card.style.opacity = '0.3';
+  var formData = new FormData();
+  formData.append('messageId', id);
+  fetch('/dashboard/dismiss-email?token=' + token, {
+    method: 'POST',
+    body: formData,
+  }).then(function(r) {
+    if (r.ok && card) card.style.display = 'none';
+  }).catch(function() {
+    if (card) card.style.opacity = '1';
+  });
 }
 </script>
 </body>

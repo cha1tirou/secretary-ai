@@ -32,6 +32,21 @@ function esc(str: string): string {
   return (str ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
+function fmtDate(dateStr: string): string {
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    const now = new Date();
+    const diffDays = Math.floor((now.getTime() - d.getTime()) / 86400000);
+    if (diffDays === 0) return "\u4ECA\u65E5";
+    if (diffDays === 1) return "\u6628\u65E5";
+    if (diffDays <= 6) return `${diffDays}\u65E5\u524D`;
+    return d.toLocaleDateString("ja-JP", { month: "numeric", day: "numeric" });
+  } catch {
+    return dateStr;
+  }
+}
+
 function fmtFrom(from: string): string {
   const match = from.match(/^([^<]+)<[^>]+>/);
   if (match && match[1]?.trim()) {
@@ -592,7 +607,7 @@ function buildDashboardHtml(
       ${info ? `<div style="font-size:12px;font-weight:700;color:${info.color};margin-bottom:8px">${info.icon} ${info.text}</div>` : ""}
       <div class="card-from">${esc(fmtFrom(e.from))}</div>
       <div class="card-subject">${esc(e.subject || "(\u4EF6\u540D\u306A\u3057)")}</div>
-      <div class="card-date">${esc(e.date)}</div>
+      <div class="card-date">${esc(fmtDate(e.date))}</div>
       <div class="card-actions">
         <a href="/dashboard/email-view?token=${token}&from=${encodeURIComponent(e.from)}&subject=${encodeURIComponent(e.subject ?? "")}&threadId=${encodeURIComponent(e.threadId)}" class="btn-green" style="text-decoration:none;display:inline-block">AI\u304C\u8FD4\u4FE1\u6848\u3092\u4F5C\u308B</a>
         <button onclick="dismissEmail('${esc(e.id)}','${token}')" class="btn-dismiss">\u8FD4\u4FE1\u4E0D\u8981</button>
@@ -654,7 +669,7 @@ body { font-family:-apple-system,sans-serif; background:#f9fafb; min-height:100v
     <div class="tab" onclick="switchTab('awaiting')">\u23F3 \u8FD4\u4FE1\u5F85\u3061</div>
   </div>
   <div id="tab-reply" style="display:block">
-    ${unrepliedCards || '<p class="empty">\u8981\u8FD4\u4FE1\u306E\u30E1\u30FC\u30EB\u306F\u3042\u308A\u307E\u305B\u3093</p>'}
+    ${unrepliedCards || '<p class="empty">\u672A\u8FD4\u4FE1\u306E\u30E1\u30FC\u30EB\u306F\u3042\u308A\u307E\u305B\u3093 \uD83C\uDF89</p>'}
   </div>
   <div id="tab-awaiting" style="display:none">
     ${awaitingCards || '<p class="empty">\u8FD4\u4FE1\u5F85\u3061\u306E\u30E1\u30FC\u30EB\u306F\u3042\u308A\u307E\u305B\u3093</p>'}
@@ -852,7 +867,7 @@ function buildEmailViewHtml(userId: string, from: string, subject: string, threa
           <div style="background:${bgColor};border-radius:8px;padding:14px;margin-bottom:12px">
             <div style="display:flex;justify-content:space-between;margin-bottom:8px">
               <span style="font-weight:600;font-size:14px">${esc(msgFrom)}</span>
-              <span style="color:#9ca3af;font-size:12px">${esc(msg.date.split(" ").slice(0, 4).join(" "))}</span>
+              <span style="color:#9ca3af;font-size:12px">${esc(fmtDate(msg.date))}</span>
             </div>
             <div style="font-size:14px;color:#374151;line-height:1.7;white-space:pre-wrap">${esc(msg.body.slice(0, 800))}${msg.body.length > 800 ? "\n..." : ""}</div>
           </div>`;

@@ -132,7 +132,7 @@ ${ctx.weather || "\u60C5\u5831\u306A\u3057"}
 ${eventSection}
 
 ## \u6C17\u306B\u306A\u308B\u3053\u3068
-${concerns.length === 0 ? "\u7279\u306B\u306A\u3057" : concerns.join("\n")}
+${concerns.length === 0 ? "\u7279\u306B\u306A\u3057\uFF08\u7A4D\u6975\u7684\u306B\u4ECA\u65E5\u3092\u826F\u304F\u3059\u308B\u63D0\u6848\u3092\u4E00\u8A00\u6DFB\u3048\u3066\u304F\u3060\u3055\u3044\uFF09" : concerns.join("\n")}
 
 ## \u30BF\u30B9\u30AF\uFF08${ctx.tasks.length}\u4EF6\uFF09
 ${ctx.tasks.length === 0 ? "\u306A\u3057" : ctx.tasks.map((t) => `- ${t.title}${t.dueDate ? `\uFF08\u671F\u65E5: ${t.dueDate}\uFF09` : ""}`).join("\n")}

@@ -405,6 +405,19 @@ export function logUsage(userId: string, actionType: string): void {
   getDb().prepare("INSERT INTO usage_logs (user_id, action_type) VALUES (?, ?)").run(userId, actionType);
 }
 
+export function hasMovementNotified(userId: string, eventId: string): boolean {
+  const row = getDb().prepare(`
+    SELECT 1 FROM usage_logs
+    WHERE user_id = ? AND action_type = ?
+    AND created_at >= date('now', 'localtime')
+  `).get(userId, `move_reminder:${eventId}`);
+  return !!row;
+}
+
+export function recordMovementNotified(userId: string, eventId: string): void {
+  getDb().prepare("INSERT INTO usage_logs (user_id, action_type) VALUES (?, ?)").run(userId, `move_reminder:${eventId}`);
+}
+
 export const USAGE_LIMITS: Record<string, Record<string, number>> = {
   trial:   { credit: 30 },
   light:   { credit: 100 },

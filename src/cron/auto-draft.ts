@@ -1,15 +1,13 @@
 import cron from "node-cron";
 import { messagingApi } from "@line/bot-sdk";
 import { getTodayEvents } from "../integrations/gcal.js";
-import { getAllUserIds, getGoogleAccountsByUserId } from "../db/queries.js";
+import { getAllUserIds, getGoogleAccountsByUserId, hasMovementNotified, recordMovementNotified } from "../db/queries.js";
 
 function getClient() {
   return new messagingApi.MessagingApiClient({
     channelAccessToken: process.env["LINE_CHANNEL_ACCESS_TOKEN"] || "",
   });
 }
-
-const notifiedEventIds = new Set<string>();
 
 async function checkMoveReminder(
   client: messagingApi.MessagingApiClient,
@@ -27,9 +25,8 @@ async function checkMoveReminder(
       const diff = eventStart - now;
 
       if (diff > oneHourMs - fiveMinMs && diff < oneHourMs + fiveMinMs) {
-        const key = `${userId}:${e.id}`;
-        if (notifiedEventIds.has(key)) continue;
-        notifiedEventIds.add(key);
+        if (hasMovementNotified(userId, e.id)) continue;
+        recordMovementNotified(userId, e.id);
 
         const time = new Date(e.start).toLocaleTimeString("ja-JP", {
           hour: "2-digit",

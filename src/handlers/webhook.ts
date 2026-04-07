@@ -175,8 +175,8 @@ function buildWelcomeMessages(authUrl: string): { batch1: any[]; batch2: any[] }
           { type: "separator" },
           { type: "box", layout: "vertical", backgroundColor: "#f5f5f5", cornerRadius: "8px", paddingAll: "12px", spacing: "xs",
             contents: [
-              { type: "text", text: "\uD83D\uDD12 \u30BB\u30AD\u30E5\u30EA\u30C6\u30A3\u306B\u3064\u3044\u3066", size: "xs", weight: "bold" },
-              { type: "text", text: "\u30FBOAUTH\u8A8D\u8A3C\u306E\u307F\u4F7F\u7528\uFF08\u30D1\u30B9\u30EF\u30FC\u30C9\u306F\u53D6\u5F97\u3057\u307E\u305B\u3093\uFF09\n\u30FB\u30A2\u30AF\u30BB\u30B9\u3059\u308B\u306E\u306FGmail\u30FBCalendar\u306E\u307F\n\u30FB\u8907\u6570\u30A2\u30AB\u30A6\u30F3\u30C8\u306B\u3082\u5F8C\u304B\u3089\u5BFE\u5FDC\u3067\u304D\u307E\u3059", size: "xxs", color: "#666666", wrap: true },
+              { type: "text", text: "\uD83D\uDD12 Google\u9023\u643A\u306B\u3064\u3044\u3066", size: "xs", weight: "bold" },
+              { type: "text", text: "\u30FBOAuth\u8A8D\u8A3C\u306E\u307F\uFF08\u30D1\u30B9\u30EF\u30FC\u30C9\u4E0D\u8981\uFF09\n\u30FB\u30A2\u30AF\u30BB\u30B9\u306FGmail\u30FBCalendar\u306E\u307F\n\u30FBDrive\u30FB\u9023\u7D61\u5148\u7B49\u306B\u306F\u4E00\u5207\u30A2\u30AF\u30BB\u30B9\u3057\u307E\u305B\u3093\n\u30FB\u3044\u3064\u3067\u3082\u9023\u643A\u89E3\u9664\u3067\u304D\u307E\u3059\n\u30FB\u53D6\u5F97\u60C5\u5831\u306F\u6A5F\u80FD\u63D0\u4F9B\u306E\u307F\u306B\u4F7F\u7528\u3057\u307E\u3059", size: "xxs", color: "#666666", wrap: true },
             ],
           },
         ],

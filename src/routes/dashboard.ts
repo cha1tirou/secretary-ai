@@ -206,6 +206,22 @@ dashboard.get("/dashboard", async (c) => {
   }
 });
 
+// ── GET /dashboard/email-view ──
+dashboard.get("/dashboard/email-view", async (c) => {
+  const userId = getToken(c);
+  if (!userId) return c.text("token required", 401);
+  const from = c.req.query("from") ?? "";
+  const subject = c.req.query("subject") ?? "";
+  const threadId = c.req.query("threadId") ?? "";
+  try {
+    const thread = await getThread(threadId, userId).catch(() => [] as Email[]);
+    return c.html(buildEmailViewHtml(userId, from, subject, threadId, thread));
+  } catch (err) {
+    console.error("[dashboard/email-view] error:", err);
+    return c.text("Internal Server Error", 500);
+  }
+});
+
 // ── GET /dashboard/reply-input ──
 dashboard.get("/dashboard/reply-input", (c) => {
   const userId = getToken(c);
@@ -578,7 +594,7 @@ function buildDashboardHtml(
       <div class="card-subject">${esc(e.subject || "(\u4EF6\u540D\u306A\u3057)")}</div>
       <div class="card-date">${esc(e.date)}</div>
       <div class="card-actions">
-        <a href="/dashboard/reply-input?token=${token}&from=${encodeURIComponent(e.from)}&subject=${encodeURIComponent(e.subject ?? "")}&threadId=${encodeURIComponent(e.threadId)}" class="btn-green" style="text-decoration:none;display:inline-block">AI\u304C\u8FD4\u4FE1\u6848\u3092\u4F5C\u308B</a>
+        <a href="/dashboard/email-view?token=${token}&from=${encodeURIComponent(e.from)}&subject=${encodeURIComponent(e.subject ?? "")}&threadId=${encodeURIComponent(e.threadId)}" class="btn-green" style="text-decoration:none;display:inline-block">AI\u304C\u8FD4\u4FE1\u6848\u3092\u4F5C\u308B</a>
         <button onclick="dismissEmail('${esc(e.id)}','${token}')" class="btn-dismiss">\u8FD4\u4FE1\u4E0D\u8981</button>
       </div>
     </div>`;
@@ -821,6 +837,60 @@ details summary { cursor:pointer; color:#6b7280; font-size:14px; font-weight:600
 function showEdit(id) { document.getElementById('view-'+id).style.display='none'; document.getElementById('edit-'+id).style.display='block'; }
 function hideEdit(id) { document.getElementById('view-'+id).style.display='block'; document.getElementById('edit-'+id).style.display='none'; }
 </script>
+</body>
+</html>`;
+}
+
+function buildEmailViewHtml(userId: string, from: string, subject: string, threadId: string, thread: Email[]): string {
+  const senderName = fmtFrom(from);
+  const threadHtml = thread.length === 0
+    ? '<p style="color:#9ca3af;font-size:14px">\u30E1\u30FC\u30EB\u306E\u5185\u5BB9\u3092\u8AAD\u307F\u8FBC\u3081\u307E\u305B\u3093\u3067\u3057\u305F\u3002</p>'
+    : thread.map((msg, i) => {
+        const msgFrom = fmtFrom(msg.from);
+        const bgColor = i % 2 === 0 ? "#f9fafb" : "#ffffff";
+        return `
+          <div style="background:${bgColor};border-radius:8px;padding:14px;margin-bottom:12px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+              <span style="font-weight:600;font-size:14px">${esc(msgFrom)}</span>
+              <span style="color:#9ca3af;font-size:12px">${esc(msg.date.split(" ").slice(0, 4).join(" "))}</span>
+            </div>
+            <div style="font-size:14px;color:#374151;line-height:1.7;white-space:pre-wrap">${esc(msg.body.slice(0, 800))}${msg.body.length > 800 ? "\n..." : ""}</div>
+          </div>`;
+      }).join("");
+
+  return `<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>\u30E1\u30FC\u30EB\u306E\u5185\u5BB9</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,sans-serif; background:#f9fafb; }
+.header { background:#1a1a2e; color:white; padding:16px 20px; font-size:18px; font-weight:700; }
+.container { max-width:600px; margin:0 auto; padding:20px; }
+.meta-card { background:white; border:1px solid #e5e7eb; border-radius:12px; padding:16px; margin-bottom:16px; }
+.label { font-size:12px; color:#9ca3af; margin-bottom:2px; }
+.value { font-size:15px; color:#111; font-weight:500; }
+.thread-title { font-size:15px; font-weight:700; color:#111; margin-bottom:12px; }
+.btn-reply { display:block; width:100%; background:#06C755; color:white; border:none; border-radius:12px; padding:16px; font-size:16px; font-weight:700; cursor:pointer; text-align:center; text-decoration:none; margin-top:20px; }
+.btn-back { display:block; width:100%; background:#f3f4f6; color:#374151; border:none; border-radius:12px; padding:14px; font-size:15px; cursor:pointer; text-align:center; text-decoration:none; margin-top:8px; }
+</style>
+</head>
+<body>
+<div class="header">\uD83D\uDCE7 \u30E1\u30FC\u30EB\u306E\u5185\u5BB9</div>
+<div class="container">
+  <div class="meta-card">
+    <div class="label">\u5DEE\u51FA\u4EBA</div>
+    <div class="value" style="margin-bottom:10px">${esc(senderName)}</div>
+    <div class="label">\u4EF6\u540D</div>
+    <div class="value">${esc(subject || "(\u4EF6\u540D\u306A\u3057)")}</div>
+  </div>
+  <div class="thread-title">\uD83D\uDCE8 \u30E1\u30C3\u30BB\u30FC\u30B8\uFF08${thread.length}\u4EF6\uFF09</div>
+  ${threadHtml}
+  <a href="/dashboard/reply-input?token=${userId}&from=${encodeURIComponent(from)}&subject=${encodeURIComponent(subject)}&threadId=${encodeURIComponent(threadId)}" class="btn-reply">\u2728 \u8FD4\u4FE1\u6848\u3092\u4F5C\u308B</a>
+  <a href="/dashboard?token=${userId}" class="btn-back">\u2190 \u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9\u306B\u623B\u308B</a>
+</div>
 </body>
 </html>`;
 }

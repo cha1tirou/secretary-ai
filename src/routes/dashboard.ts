@@ -440,58 +440,6 @@ dashboard.post("/reply/skip", async (c) => {
   }
 });
 
-// ── Debug (temporary) ──
-
-dashboard.get("/debug/cache", (c) => {
-  const secret = c.req.query("s");
-  if (secret !== "dbg2026") return c.text("forbidden", 403);
-  const db = getDb();
-  const rows = db.prepare("SELECT message_id, category, cached_at FROM email_cache ORDER BY cached_at DESC LIMIT 20").all();
-  return c.json(rows);
-});
-
-dashboard.post("/debug/clear-cache", (c) => {
-  const secret = c.req.query("s");
-  if (secret !== "dbg2026") return c.text("forbidden", 403);
-  const db = getDb();
-  const result = db.prepare("DELETE FROM email_cache").run();
-  return c.json({ deleted: result.changes });
-});
-
-dashboard.get("/debug/emails", async (c) => {
-  const secret = c.req.query("s");
-  if (secret !== "dbg2026") return c.text("forbidden", 403);
-  const userId = c.req.query("uid") ?? "";
-  if (!userId) return c.text("uid required", 400);
-
-  try {
-    const emails = await getRecentEmails(userId, 14);
-    const accounts = getGoogleAccountsByUserId(userId);
-    const myEmails = accounts.map((a) => a.email).filter((e): e is string => e !== null);
-
-    const results = await Promise.all(emails.slice(0, 15).map(async (e) => {
-      const auto = isAutoSenderEmail(e);
-      const label = auto ? null : detectLabel(e);
-      let myReply: boolean | null = null;
-      if (!auto) {
-        myReply = await checkMyReplyExists(e.threadId, userId, myEmails).catch(() => null as any);
-      }
-      return {
-        from: e.from.slice(0, 50),
-        subject: (e.subject ?? "").slice(0, 40) || "(\u306A\u3057)",
-        isAutoSender: auto,
-        label,
-        myReplyExists: myReply,
-        date: e.date,
-      };
-    }));
-
-    return c.json({ myEmails, count: emails.length, results });
-  } catch (err) {
-    return c.json({ error: String(err) });
-  }
-});
-
 // ── Task Routes ──
 
 dashboard.get("/dashboard/tasks", (c) => {

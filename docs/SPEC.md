@@ -135,38 +135,30 @@ LINEで動くAI秘書。Gmail・Google Calendarと連携し、メール管理・
 
 ## 8. メール分類ロジック
 
-### Phase 1: ルールベース（newsletter即確定）
+### 自動送信の除外（ルールベース）
 
-| シグナル | 判定 |
+以下に該当するメールは要返信リストに表示しない：
+- no-reply/noreply/newsletter/marketing系のFromアドレス
+- List-Unsubscribe / List-Id ヘッダーあり
+- マーケティング系ドメイン（campaign/promo/bulk等）
+
+### ラベル付与（ルールベース・件名＋本文200文字）
+
+| ラベル | キーワード |
 |---|---|
-| List-Unsubscribe / List-Id ヘッダー | newsletter |
-| Precedence: bulk/list/junk | newsletter |
-| From: no-reply/newsletter/marketing等 | newsletter |
-| To/CCに自分のアドレスなし（BCC配信） | newsletter |
-| 本文冒頭300字に「配信停止」「unsubscribe」 | newsletter |
-| プロモ件名 + 企業ドメイン | newsletter |
+| ⚡ 急ぎ | 至急・ASAP・急ぎ・本日中・緊急 |
+| 🗓 日程調整 | 日程・MTG・打ち合わせ・候補日・都合・空き |
+| ❓ 質問・確認 | いかがでしょうか・教えてください・ご確認 |
+| 📋 依頼・お願い | お願い・依頼・してください・提出 |
 
-### Phase 2: キーワード即確定
+### 表示対象
 
-| シグナル | 判定 |
-|---|---|
-| 件名/本文に「至急」「ASAP」「緊急」 | urgent_reply |
-| 件名に「ご確認ください」「いかがでしょうか」 | reply_later |
+自動送信でなく、スレッドに自分の返信がない全メール（最大15件）
 
-### Phase 3: Haiku 4択分類
+### Haikuによるカテゴリ分類は廃止（ADR-011参照）
 
-| カテゴリ | 説明 |
-|---|---|
-| newsletter | メルマガ・広告・自動通知 |
-| reply_later | 返信が必要（数日以内） |
-| action_needed | 行動が必要（締切・依頼等） |
-| fyi | 読むだけでOK |
-
-### キャッシュ
-
-- `email_cache`テーブルに分類結果を保存
-- 7日間有効（`cached_at >= datetime('now', '-7 days', 'localtime')`）
-- `classifyEmailWithCache()`でキャッシュスルー
+以前はHaikuで4択分類していたが、誤分類が多発したため廃止。
+ルールベースの自動送信除外＋ラベル付与に移行。
 
 ## 9. Google OAuth情報
 

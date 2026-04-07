@@ -2,7 +2,6 @@ import Anthropic from "@anthropic-ai/sdk";
 import { getTodayEvents, getTomorrowEvents } from "../integrations/gcal.js";
 import { getRecentEmails, getSentEmails, checkThreadReplied, checkMyReplyExists } from "../integrations/gmail.js";
 import { getWeatherSummary, getTomorrowWeatherSummary } from "../integrations/weather.js";
-import { classifyEmailWithCache } from "./classifier.js";
 import { getGoogleAccountsByUserId, getTasks } from "../db/queries.js";
 import type { CalendarEvent, Email } from "../types.js";
 
@@ -17,6 +16,12 @@ function fmtTime(isoStr: string): string {
 
 function fmtFrom(from: string): string {
   return (from.split("<")[0] ?? "").trim() || from;
+}
+
+function isAutoSender(email: Email): boolean {
+  if (/no-?reply|noreply|newsletter|notifications?|donotreply|marketing|bounce|automail/i.test(email.from)) return true;
+  if (email.listUnsubscribe || email.listId) return true;
+  return false;
 }
 
 type NeedsReplyEmail = { from: string; subject: string; daysAgo: number };
@@ -48,20 +53,15 @@ async function buildMorningContext(userId: string): Promise<MorningContext> {
 
   const unreadCount = recentEmails.filter((e) => e.isUnread).length;
 
-  // 要返信メール（キャッシュ付き分類）
+  // 要返信メール（ルールベース・Haiku不使用）
   const needsReplyEmails: NeedsReplyEmail[] = [];
   for (const email of recentEmails) {
     if (needsReplyEmails.length >= 3) break;
-    const subjectClean = (email.subject ?? "").trim();
-    const isAutoSender = /no-?reply|noreply|newsletter|notifications?|donotreply|marketing|bounce/i.test(email.from);
-    if (subjectClean === "" && isAutoSender) continue;
-    if (subjectClean === "Re:" && isAutoSender) continue;
-    const category = await classifyEmailWithCache(email, userId, myEmails[0]).catch(() => "fyi" as const);
-    if (category !== "reply_later" && category !== "urgent_reply") continue;
+    if (isAutoSender(email)) continue;
     const myReplyExists = await checkMyReplyExists(email.threadId, userId, myEmails).catch(() => false);
     if (myReplyExists) continue;
     const daysAgo = Math.floor((Date.now() - new Date(email.date).getTime()) / 86400000);
-    needsReplyEmails.push({ from: fmtFrom(email.from), subject: email.subject, daysAgo });
+    needsReplyEmails.push({ from: fmtFrom(email.from), subject: email.subject || "(\u4EF6\u540D\u306A\u3057)", daysAgo });
   }
 
   // 返信待ちメール（3日以上・最大2件）
@@ -99,10 +99,10 @@ function buildMorningPrompt(ctx: MorningContext): string {
   const concerns: string[] = [];
   for (const e of ctx.needsReplyEmails) {
     const dayStr = e.daysAgo === 0 ? "\u4ECA\u65E5" : e.daysAgo === 1 ? "\u6628\u65E5" : `${e.daysAgo}\u65E5\u524D`;
-    concerns.push(`\u26A0\uFE0F ${e.from}\u3055\u3093\u304B\u3089\u300C${e.subject}\u300D\uFF08${dayStr}\u53D7\u4FE1\uFF09\u2192 \u307E\u3060\u8FD4\u4FE1\u3067\u304D\u3066\u3044\u307E\u305B\u3093`);
+    concerns.push(`\uD83D\uDCE9 ${e.from}\u3055\u3093\u300C${e.subject}\u300D\uFF08${dayStr}\u30FB\u672A\u8FD4\u4FE1\uFF09`);
   }
   for (const e of ctx.awaitingReplyEmails) {
-    concerns.push(`\u26A0\uFE0F ${e.to}\u3055\u3093\u3078\u306E\u300C${e.subject}\u300D\u2192 ${e.daysAgo}\u65E5\u7D4C\u904E\u3001\u8FD4\u4FE1\u304C\u6765\u3066\u3044\u307E\u305B\u3093`);
+    concerns.push(`\u23F3 ${e.to}\u3055\u3093\u3078\u300C${e.subject}\u300D\uFF08${e.daysAgo}\u65E5\u7D4C\u904E\u30FB\u8FD4\u4FE1\u5F85\u3061\uFF09`);
   }
 
   return `\u3042\u306A\u305F\u306FLINE\u3067\u52D5\u304FAI\u79D8\u66F8\u3067\u3059\u3002\u4EE5\u4E0B\u306E\u60C5\u5831\u3092\u3082\u3068\u306B\u3001\u671D\u306E\u30D6\u30EA\u30FC\u30D5\u30A3\u30F3\u30B0\u3092\u4F5C\u6210\u3057\u3066\u304F\u3060\u3055\u3044\u3002
@@ -146,10 +146,10 @@ function buildMorningMock(ctx: MorningContext): string {
   const concerns: string[] = [];
   for (const e of ctx.needsReplyEmails) {
     const dayStr = e.daysAgo === 0 ? "\u4ECA\u65E5" : e.daysAgo === 1 ? "\u6628\u65E5" : `${e.daysAgo}\u65E5\u524D`;
-    concerns.push(`\u26A0\uFE0F ${e.from}\u3055\u3093\u300C${e.subject}\u300D\uFF08${dayStr}\uFF09\u2192 \u672A\u8FD4\u4FE1`);
+    concerns.push(`\uD83D\uDCE9 ${e.from}\u3055\u3093\u300C${e.subject}\u300D\uFF08${dayStr}\u30FB\u672A\u8FD4\u4FE1\uFF09`);
   }
   for (const e of ctx.awaitingReplyEmails) {
-    concerns.push(`\u26A0\uFE0F ${e.to}\u3055\u3093\u3078\u300C${e.subject}\u300D\u2190 ${e.daysAgo}\u65E5\u7D4C\u904E`);
+    concerns.push(`\u23F3 ${e.to}\u3055\u3093\u3078\u300C${e.subject}\u300D\uFF08${e.daysAgo}\u65E5\u7D4C\u904E\u30FB\u8FD4\u4FE1\u5F85\u3061\uFF09`);
   }
   if (concerns.length > 0) {
     text += `\n\u2501\u2501 \u6C17\u306B\u306A\u308B\u3053\u3068 \u2501\u2501\n`;
@@ -224,12 +224,7 @@ export async function generateNoonBriefing(userId: string): Promise<string> {
     let needsReplyCount = 0;
     for (const email of recentEmails) {
       if (needsReplyCount >= 5) break;
-      const noonSubject = (email.subject ?? "").trim();
-      const noonAutoSender = /no-?reply|noreply|newsletter|notifications?|donotreply|marketing|bounce/i.test(email.from);
-      if (noonSubject === "" && noonAutoSender) continue;
-      if (noonSubject === "Re:" && noonAutoSender) continue;
-      const cat = await classifyEmailWithCache(email, userId, myEmails[0]).catch(() => "fyi" as const);
-      if (cat !== "reply_later" && cat !== "urgent_reply") continue;
+      if (isAutoSender(email)) continue;
       const myReply = await checkMyReplyExists(email.threadId, userId, myEmails).catch(() => false);
       if (!myReply) needsReplyCount++;
     }
@@ -263,12 +258,7 @@ export async function generateEveningBriefing(userId: string): Promise<string> {
     let needsReplyCount = 0;
     for (const email of recentEmails) {
       if (needsReplyCount >= 5) break;
-      const eveSubject = (email.subject ?? "").trim();
-      const eveAutoSender = /no-?reply|noreply|newsletter|notifications?|donotreply|marketing|bounce/i.test(email.from);
-      if (eveSubject === "" && eveAutoSender) continue;
-      if (eveSubject === "Re:" && eveAutoSender) continue;
-      const cat = await classifyEmailWithCache(email, userId, myEmails[0]).catch(() => "fyi" as const);
-      if (cat !== "reply_later" && cat !== "urgent_reply") continue;
+      if (isAutoSender(email)) continue;
       const myReply = await checkMyReplyExists(email.threadId, userId, myEmails).catch(() => false);
       if (!myReply) needsReplyCount++;
     }

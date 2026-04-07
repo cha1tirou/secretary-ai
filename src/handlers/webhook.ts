@@ -255,6 +255,46 @@ async function handleMessage(
   const userId = messageEvent.source.userId;
   if (!userId) return;
 
+  // 管理者コマンド
+  const adminUserId = process.env["ADMIN_LINE_USER_ID"];
+  if (adminUserId && userId === adminUserId) {
+    const approveMatch = text.match(/^承認\s+([^\s]+@[^\s]+)$/);
+    if (approveMatch) {
+      const email = approveMatch[1]!.toLowerCase();
+      const { approveWaitlistByEmail, getWaitlistByEmail } = await import("../db/queries.js");
+      const entry = getWaitlistByEmail(email);
+      if (!entry) {
+        await client.replyMessage({ replyToken: messageEvent.replyToken, messages: [{ type: "text", text: `\u274C ${email} \u306F\u7533\u8FBC\u30EA\u30B9\u30C8\u306B\u3042\u308A\u307E\u305B\u3093\u3002` }] });
+        return;
+      }
+      if (entry.status === "approved") {
+        await client.replyMessage({ replyToken: messageEvent.replyToken, messages: [{ type: "text", text: `\u26A0\uFE0F ${email} \u306F\u3059\u3067\u306B\u627F\u8A8D\u6E08\u307F\u3067\u3059\u3002` }] });
+        return;
+      }
+      approveWaitlistByEmail(email);
+      try {
+        const lineAddUrl = "https://line.me/R/ti/p/@210nulgd";
+        const { sendInviteEmail } = await import("../integrations/gmail.js");
+        await sendInviteEmail(entry.name, email, lineAddUrl);
+        await client.replyMessage({ replyToken: messageEvent.replyToken, messages: [{ type: "text", text: `\u2705 ${entry.name}\u3055\u3093\uFF08${email}\uFF09\u3092\u627F\u8A8D\u3057\u3001\u62DB\u5F85\u30E1\u30FC\u30EB\u3092\u9001\u4FE1\u3057\u307E\u3057\u305F\u3002` }] });
+      } catch (err) {
+        await client.replyMessage({ replyToken: messageEvent.replyToken, messages: [{ type: "text", text: `\u26A0\uFE0F \u627F\u8A8D\u3057\u307E\u3057\u305F\u304C\u62DB\u5F85\u30E1\u30FC\u30EB\u9001\u4FE1\u306B\u5931\u6557\u3057\u307E\u3057\u305F\u3002\n\u624B\u52D5\u3067\u6848\u5185\u3092\u304A\u9001\u308A\u304F\u3060\u3055\u3044\u3002\nError: ${err}` }] });
+      }
+      return;
+    }
+    if (text === "\u7533\u8FBC\u4E00\u89A7" || text === "\u7533\u3057\u8FBC\u307F\u4E00\u89A7") {
+      const { getWaitlistPending } = await import("../db/queries.js");
+      const list = getWaitlistPending();
+      if (list.length === 0) {
+        await client.replyMessage({ replyToken: messageEvent.replyToken, messages: [{ type: "text", text: "\uD83D\uDCDD \u627F\u8A8D\u5F85\u3061\u306E\u7533\u8FBC\u306F\u3042\u308A\u307E\u305B\u3093\u3002" }] });
+      } else {
+        const lines = list.map((e, i) => `${i + 1}. ${e.name}\uFF08${e.email}\uFF09\n   \u7533\u8FBC\u65E5: ${e.created_at.slice(0, 10)}`);
+        await client.replyMessage({ replyToken: messageEvent.replyToken, messages: [{ type: "text", text: `\uD83D\uDCDD \u627F\u8A8D\u5F85\u3061 ${list.length}\u4EF6\n\n${lines.join("\n\n")}\n\n\u627F\u8A8D\u3059\u308B\u306B\u306F\u300C\u627F\u8A8D \u30E1\u30FC\u30EB\u30A2\u30C9\u30EC\u30B9\u300D\u3068\u9001\u3063\u3066\u304F\u3060\u3055\u3044\u3002` }] });
+      }
+      return;
+    }
+  }
+
   // pending_reply の操作（「送信」「保留」「キャンセル」）
   const pendingMatch = text.match(/^(送信|保留|キャンセル)\s*#?(\d+)$/);
   if (pendingMatch) {

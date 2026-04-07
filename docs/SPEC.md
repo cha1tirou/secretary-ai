@@ -176,21 +176,35 @@ LINEで動くAI秘書。Gmail・Google Calendarと連携し、メール管理・
 ## 10. αテスト運用フロー
 
 ```
-1. ユーザーがLINE友達追加
+1. ユーザーがLP（/）の申し込みフォームからGmailアドレス・名前を登録
+   → waitlistテーブルにstatus=pendingで保存
+   → 管理者のLINEに通知
+
+2. 管理者がGoogle Consoleにテストユーザーとして手動追加（30秒）
+
+3. 管理者がLINEで「承認 メールアドレス」と送信
+   → waitlist.status = approved に更新
+   → Gmail APIで招待メール自動送信（LINE友達追加URL付き）
+
+4. ユーザーがメールのリンクからLINE友達追加
    → 6通のウェルカムメッセージ（Flex Message）
    → users テーブルに plan=trial で登録
 
-2. Google Console でテストユーザー追加（手動）
-
-3. ユーザーが /auth/start?user=XX のURLをコピー
-   → SafariでGoogle OAuth完了
+5. ユーザーがLINEのリンクからGoogle OAuth完了
    → google_accounts に保存
    → LINEに「連携完了」通知
 
-4. ユーザーがLINEで話しかける
+6. ユーザーがLINEで話しかける
    → SimpleCommand or AI対話
-   → ブリーフィングが自動配信開始
+   → 翌朝からブリーフィング自動配信
 ```
+
+### 管理者コマンド（LINEから）
+
+| コマンド | 動作 |
+|---|---|
+| 申込一覧 | 承認待ちの申込を一覧表示 |
+| 承認 email@gmail.com | 承認＋招待メール自動送信 |
 
 ## 11. ファイル構成
 

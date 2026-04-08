@@ -51,7 +51,7 @@ async function sendMorningBriefing() {
 // ── 昼 12:00（ルールベース） ──
 
 async function sendNoonBriefing() {
-  console.log(`[cron] \u6627\u30D6\u30EA\u30FC\u30D5\u30A3\u30F3\u30B0\u958B\u59CB: ${new Date().toISOString()}`);
+  console.log(`[cron] \u663C\u30D6\u30EA\u30FC\u30D5\u30A3\u30F3\u30B0\u958B\u59CB: ${new Date().toISOString()}`);
   const userIds = getActiveUserIds();
   if (userIds.length === 0) return;
 
@@ -61,7 +61,7 @@ async function sendNoonBriefing() {
       const text = await generateNoonBriefing(userId);
       await sendToUser(client, userId, text);
     } catch (err) {
-      console.error(`[cron] \u6627\u30D6\u30EA\u30FC\u30D5\u30A3\u30F3\u30B0\u30A8\u30E9\u30FC (${userId}):`, err);
+      console.error(`[cron] \u663C\u30D6\u30EA\u30FC\u30D5\u30A3\u30F3\u30B0\u30A8\u30E9\u30FC (${userId}):`, err);
     }
   }
 }

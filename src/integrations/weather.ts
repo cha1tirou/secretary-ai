@@ -45,9 +45,9 @@ function buildSummary(items: ForecastItem[], label: string): string {
 
   let text = `${weatherIcon(icon)} ${label}${desc}\u3001\u6700\u9AD8${maxTemp}\u2103\u30FB\u6700\u4F4E${minTemp}\u2103`;
   if (maxPop >= 50) {
-    text += `\u3002\u2602\uFE0F \u964D\u6C34\u78BA\u7387${maxPop}%\u3001\u50B5\u3092\u304A\u5FD8\u308C\u306A\u304F\u3002`;
+    text += `\u3002\u2602\uFE0F \u964D\u6C34\u78BA\u7387${maxPop}%\u3001\u5098\u3092\u304A\u5FD8\u308C\u306A\u304F\u3002`;
   } else if (maxPop >= 30) {
-    text += `\u3002\u964D\u6C34\u78BA\u7387${maxPop}%\u3001\u5FF5\u306E\u305F\u3081\u50B5\u304C\u3042\u308B\u3068\u5B89\u5FC3\u3002`;
+    text += `\u3002\u964D\u6C34\u78BA\u7387${maxPop}%\u3001\u5FF5\u306E\u305F\u3081\u5098\u304C\u3042\u308B\u3068\u5B89\u5FC3\u3002`;
   } else {
     text += `\u3002`;
   }

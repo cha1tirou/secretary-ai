@@ -5,13 +5,14 @@ import {
   type WebhookEvent,
   type MessageEvent,
 } from "@line/bot-sdk";
-import { handleWithSecretary } from "../agents/secretary.js";
 import { sendReply } from "../integrations/gmail.js";
 import {
   upsertUser,
+  getUser,
   getPendingReply,
   updatePendingReplyStatus,
 } from "../db/queries.js";
+import { runAgent } from "../agent/index.js";
 
 function getBaseUrl(): string {
   return (
@@ -344,7 +345,7 @@ async function handleMessage(
     return;
   }
 
-  // secretary エージェントに全委譲
+  // Agentに全委譲
   // 3秒ルール: まず確認中を返してからバックグラウンドで処理
   await client.replyMessage({
     replyToken: messageEvent.replyToken,
@@ -352,14 +353,16 @@ async function handleMessage(
   });
 
   try {
-    const response = await handleWithSecretary(userId, text);
+    const user = getUser(userId);
+    const userName = user?.displayName ?? "ユーザー";
+    const response = await runAgent(userId, text, userName);
     await client.pushMessage({
       to: userId,
       messages: [{ type: "text", text: response }],
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error("[webhook] secretary error:", err);
+    console.error("[webhook] agent error:", err);
     await client.pushMessage({
       to: userId,
       messages: [{ type: "text", text: `エラー: ${msg}` }],

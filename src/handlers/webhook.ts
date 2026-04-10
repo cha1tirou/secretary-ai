@@ -87,7 +87,7 @@ async function handleMessage(
   // 3秒ルール: まず確認中を返してからバックグラウンドで処理
   await client.replyMessage({
     replyToken: messageEvent.replyToken,
-    messages: [{ type: "text", text: "確認中..." }],
+    messages: [{ type: "text", text: "⏳ AIが処理中です（10〜30秒）\nこのトークを閉じても結果が届きます 👍" }],
   });
 
   try {

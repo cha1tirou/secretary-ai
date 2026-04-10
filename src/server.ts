@@ -72,6 +72,18 @@ app.post("/apply", async (c) => {
   }
 });
 
+// プライバシーポリシー
+app.get("/privacy", (c) => {
+  const html = readFileSync(join(process.cwd(), "public/privacy.html"), "utf-8");
+  return c.html(html);
+});
+
+// 利用規約
+app.get("/terms", (c) => {
+  const html = readFileSync(join(process.cwd(), "public/terms.html"), "utf-8");
+  return c.html(html);
+});
+
 // LINE Webhook
 app.route("/", webhook);
 

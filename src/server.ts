@@ -3,12 +3,9 @@ import { Hono } from "hono";
 import "dotenv/config";
 import { readFileSync, mkdirSync } from "fs";
 import { join, dirname } from "path";
-import { initDb, createWaitlistEntry, getWaitlistByEmail } from "./db/queries.js";
+import { initDb } from "./db/queries.js";
 import { webhook } from "./handlers/webhook.js";
 import { auth } from "./integrations/auth.js";
-import { startCron } from "./cron/morning.js";
-import { startAutoDraft } from "./cron/auto-draft.js";
-import { dashboard } from "./routes/dashboard.js";
 
 const app = new Hono();
 
@@ -19,13 +16,8 @@ mkdirSync(dirname(dbPath), { recursive: true });
 // DB初期化
 initDb();
 
-// Cron起動
-startCron();
-startAutoDraft();
-
 // ヘルスチェック
 app.get("/health", (c) => c.json({ status: "ok" }));
-
 
 // LP（ランディングページ）
 app.get("/", (c) => {
@@ -34,41 +26,6 @@ app.get("/", (c) => {
     return c.html(html);
   } catch {
     return c.text("AI秘書 - Coming Soon");
-  }
-});
-
-// \u7533\u3057\u8FBC\u307F\u30D5\u30A9\u30FC\u30E0
-app.post("/apply", async (c) => {
-  try {
-    const body = await c.req.parseBody();
-    const name = ((body["name"] as string) ?? "").trim();
-    const email = ((body["email"] as string) ?? "").trim().toLowerCase();
-
-    if (!name || !email || !email.includes("@")) {
-      return c.json({ ok: false, error: "\u540D\u524D\u3068Gmail\u30A2\u30C9\u30EC\u30B9\u3092\u6B63\u3057\u304F\u5165\u529B\u3057\u3066\u304F\u3060\u3055\u3044" }, 400);
-    }
-
-    const existing = getWaitlistByEmail(email);
-    if (existing) {
-      if (existing.status === "approved") return c.json({ ok: false, error: "already_approved" });
-      return c.json({ ok: false, error: "already_registered" });
-    }
-
-    createWaitlistEntry(name, email);
-
-    // \u7BA1\u7406\u8005\u30E1\u30FC\u30EB\u306B\u901A\u77E5
-    const adminEmail = process.env["ADMIN_EMAIL"];
-    if (adminEmail) {
-      const { sendAdminNotificationEmail } = await import("./integrations/gmail.js");
-      sendAdminNotificationEmail(adminEmail, name, email).catch((err: unknown) =>
-        console.error("[apply] email notify error:", err)
-      );
-    }
-
-    return c.json({ ok: true });
-  } catch (err) {
-    console.error("[apply] error:", err);
-    return c.json({ ok: false, error: "\u30B5\u30FC\u30D0\u30FC\u30A8\u30E9\u30FC\u304C\u767A\u751F\u3057\u307E\u3057\u305F" }, 500);
   }
 });
 
@@ -90,10 +47,6 @@ app.route("/", webhook);
 // Google OAuth2
 app.route("/", auth);
 
-// Dashboard
-app.route("/", dashboard);
-
 const port = Number(process.env["PORT"]) || 3000;
 console.log(`Server running on http://localhost:${port}`);
 serve({ fetch: app.fetch, port });
-

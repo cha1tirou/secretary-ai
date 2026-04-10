@@ -35,20 +35,6 @@ CREATE TABLE IF NOT EXISTS processed_emails (
   processed_at DATETIME DEFAULT CURRENT_TIMESTAMP -- [PG] TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS tasks (
-  id          INTEGER PRIMARY KEY AUTOINCREMENT, -- [PG] SERIAL PRIMARY KEY
-  user_id     TEXT NOT NULL,
-  title       TEXT NOT NULL,
-  description TEXT,
-  due_date    TEXT,                               -- [PG] DATE
-  source      TEXT DEFAULT 'manual',
-  source_id   TEXT,
-  status      TEXT DEFAULT 'todo'
-              CHECK(status IN ('todo','done','cancelled')),
-  notified_at TEXT,                               -- [PG] TIMESTAMPTZ
-  created_at  TEXT DEFAULT (datetime('now','localtime')) -- [PG] TIMESTAMPTZ DEFAULT NOW()
-);
-
 CREATE TABLE IF NOT EXISTS google_accounts (
   id          INTEGER PRIMARY KEY AUTOINCREMENT, -- [PG] SERIAL PRIMARY KEY
   user_id     TEXT NOT NULL,                     -- [PG] VARCHAR(255)
@@ -84,13 +70,11 @@ CREATE TABLE IF NOT EXISTS pending_replies (
   sent_at          DATETIME                            -- [PG] TIMESTAMPTZ
 );
 
-CREATE TABLE IF NOT EXISTS waitlist (
-  id          INTEGER PRIMARY KEY AUTOINCREMENT,
-  name        TEXT NOT NULL,
-  email       TEXT NOT NULL UNIQUE,
-  status      TEXT DEFAULT 'pending' CHECK(status IN ('pending','approved','rejected')),
-  note        TEXT,
-  created_at  TEXT DEFAULT (datetime('now','localtime'))
+CREATE TABLE IF NOT EXISTS monthly_send_count (
+  user_id     TEXT NOT NULL,
+  year_month  TEXT NOT NULL,              -- 例: '2026-04'
+  count       INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (user_id, year_month)
 );
 
 CREATE TABLE IF NOT EXISTS email_cache (

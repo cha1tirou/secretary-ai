@@ -60,15 +60,3 @@ export type PendingReply = {
   sentAt: string | null;
 };
 
-export type Task = {
-  id: number;
-  userId: string;
-  title: string;
-  description: string | null;
-  dueDate: string | null;
-  source: string;
-  sourceId: string | null;
-  status: "todo" | "done" | "cancelled";
-  notifiedAt: string | null;
-  createdAt: string;
-};

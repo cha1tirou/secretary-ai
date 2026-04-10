@@ -2,7 +2,7 @@ import Database from "better-sqlite3";
 import { readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { User, GoogleAccount, PendingReply, Task, Plan } from "../types.js";
+import type { User, GoogleAccount, PendingReply, Plan } from "../types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -329,67 +329,45 @@ export function getPendingReply(id: number): PendingReply | undefined {
     .get(id) as PendingReply | undefined;
 }
 
-// ── Tasks ──
+// ── Monthly Send Count ──
 
-export function createTask(
-  userId: string,
-  title: string,
-  description?: string,
-  dueDate?: string,
-  source?: string,
-  sourceId?: string,
-): number {
-  const result = getDb()
+const SEND_LIMITS: Record<string, number> = {
+  trial: 5,
+  free: 5,
+  lite: 30,
+  standard: 60,
+  pro: 150,
+};
+
+export function getMonthlySendCount(userId: string): number {
+  const now = new Date();
+  const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const row = getDb()
+    .prepare("SELECT count FROM monthly_send_count WHERE user_id = ? AND year_month = ?")
+    .get(userId, yearMonth) as { count: number } | undefined;
+  return row?.count ?? 0;
+}
+
+export function incrementMonthlySendCount(userId: string): void {
+  const now = new Date();
+  const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  getDb()
     .prepare(
-      `INSERT INTO tasks (user_id, title, description, due_date, source, source_id)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO monthly_send_count (user_id, year_month, count)
+       VALUES (?, ?, 1)
+       ON CONFLICT(user_id, year_month) DO UPDATE SET count = count + 1`,
     )
-    .run(userId, title, description ?? null, dueDate ?? null, source ?? "manual", sourceId ?? null);
-  return Number(result.lastInsertRowid); // [PG] RETURNING id を使う
+    .run(userId, yearMonth);
 }
 
-export function getTasks(userId: string, status?: Task["status"]): Task[] {
-  const query = status
-    ? `SELECT id, user_id AS userId, title, description, due_date AS dueDate,
-        source, source_id AS sourceId, status, notified_at AS notifiedAt, created_at AS createdAt
-       FROM tasks WHERE user_id = ? AND status = ? ORDER BY due_date ASC, created_at ASC`
-    : `SELECT id, user_id AS userId, title, description, due_date AS dueDate,
-        source, source_id AS sourceId, status, notified_at AS notifiedAt, created_at AS createdAt
-       FROM tasks WHERE user_id = ? AND status != 'cancelled' ORDER BY due_date ASC, created_at ASC`;
-  const params = status ? [userId, status] : [userId];
-  return getDb().prepare(query).all(...params) as Task[];
-}
-
-export function updateTaskStatus(id: number, status: Task["status"]): void {
-  getDb()
-    .prepare("UPDATE tasks SET status = ? WHERE id = ?")
-    .run(status, id);
-}
-
-export function deleteTask(id: number): void {
-  getDb()
-    .prepare("UPDATE tasks SET status = 'cancelled' WHERE id = ?")
-    .run(id);
-}
-
-// ── Waitlist ──
-
-export function createWaitlistEntry(name: string, email: string): number {
-  const result = getDb().prepare("INSERT OR IGNORE INTO waitlist (name, email) VALUES (?, ?)").run(name, email);
-  return Number(result.lastInsertRowid);
-}
-
-export function getWaitlistPending(): { id: number; name: string; email: string; created_at: string }[] {
-  return getDb().prepare("SELECT id, name, email, created_at FROM waitlist WHERE status = 'pending' ORDER BY created_at ASC").all() as any[];
-}
-
-export function approveWaitlistByEmail(email: string): boolean {
-  const result = getDb().prepare("UPDATE waitlist SET status = 'approved' WHERE email = ? AND status = 'pending'").run(email);
-  return result.changes > 0;
-}
-
-export function getWaitlistByEmail(email: string): { id: number; name: string; email: string; status: string } | null {
-  return getDb().prepare("SELECT id, name, email, status FROM waitlist WHERE email = ?").get(email) as any ?? null;
+export function checkSendLimit(userId: string, plan: string): {
+  allowed: boolean;
+  used: number;
+  limit: number;
+} {
+  const limit = SEND_LIMITS[plan] ?? SEND_LIMITS["free"]!;
+  const used = getMonthlySendCount(userId);
+  return { allowed: used < limit, used, limit };
 }
 
 // ── Email Cache ──
@@ -423,19 +401,6 @@ export function getMonthlyUsage(userId: string, actionType: string): number {
 
 export function logUsage(userId: string, actionType: string): void {
   getDb().prepare("INSERT INTO usage_logs (user_id, action_type) VALUES (?, ?)").run(userId, actionType);
-}
-
-export function hasMovementNotified(userId: string, eventId: string): boolean {
-  const row = getDb().prepare(`
-    SELECT 1 FROM usage_logs
-    WHERE user_id = ? AND action_type = ?
-    AND created_at >= date('now', 'localtime')
-  `).get(userId, `move_reminder:${eventId}`);
-  return !!row;
-}
-
-export function recordMovementNotified(userId: string, eventId: string): void {
-  getDb().prepare("INSERT INTO usage_logs (user_id, action_type) VALUES (?, ?)").run(userId, `move_reminder:${eventId}`);
 }
 
 export const USAGE_LIMITS: Record<string, Record<string, number>> = {

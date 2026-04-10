@@ -160,6 +160,18 @@ export function getAllUserIds(): string[] {
   return rows.map((r) => r.user_id);
 }
 
+/** Google連携済みの全ユーザーを返す */
+export function getAllUsers(): { lineUserId: string; displayName: string | null }[] {
+  return getDb()
+    .prepare(
+      `SELECT DISTINCT u.user_id AS lineUserId, u.display_name AS displayName
+       FROM users u
+       INNER JOIN google_accounts g ON u.user_id = g.user_id
+       WHERE g.gmail_token IS NOT NULL`,
+    )
+    .all() as { lineUserId: string; displayName: string | null }[];
+}
+
 // ── Google Accounts ──
 
 export function getGoogleAccountsByUserId(userId: string): GoogleAccount[] {

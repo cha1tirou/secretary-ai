@@ -6,6 +6,7 @@ import { join, dirname } from "path";
 import { initDb } from "./db/queries.js";
 import { webhook } from "./handlers/webhook.js";
 import { auth } from "./integrations/auth.js";
+import { startBriefing } from "./cron/briefing.js";
 
 const app = new Hono();
 
@@ -15,6 +16,9 @@ mkdirSync(dirname(dbPath), { recursive: true });
 
 // DB初期化
 initDb();
+
+// ブリーフィングcron起動
+startBriefing();
 
 // ヘルスチェック
 app.get("/health", (c) => c.json({ status: "ok" }));

@@ -373,7 +373,7 @@ img { max-width: 100%; display: block; }
   transition: transform .3s;
 }
 .briefing-card:hover { transform: translateY(-4px); }
-.briefing-emoji { font-size: 36px; margin-bottom: 14px; display: block; }
+.briefing-emoji { margin-bottom: 14px; display: inline-flex; align-items: center; justify-content: center; }
 .briefing-time {
   font-size: 13px;
   font-weight: 700;
@@ -410,7 +410,7 @@ img { max-width: 100%; display: block; }
   border-color: rgba(34, 197, 94, .25);
   background: var(--surface-hover);
 }
-.classify-emoji { font-size: 28px; margin-bottom: 12px; display: block; }
+.classify-emoji { margin-bottom: 12px; display: inline-flex; align-items: center; justify-content: center; }
 .classify-name {
   font-size: 17px;
   font-weight: 700;
@@ -455,7 +455,7 @@ img { max-width: 100%; display: block; }
   font-size: 16px;
   margin-bottom: 20px;
 }
-.step-emoji { font-size: 36px; margin-bottom: 14px; display: block; }
+.step-emoji { margin-bottom: 14px; display: inline-flex; align-items: center; justify-content: center; }
 .step-title {
   font-size: 17px;
   font-weight: 700;
@@ -655,8 +655,8 @@ footer a:hover { color: var(--white); }
             <svg class="line-header-back" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>
             <div class="line-header-title">AI秘書</div>
             <div class="line-header-icons">
-              <span>🔍</span>
-              <span>☰</span>
+              <span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></span>
+              <span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></span>
             </div>
           </div>
           <div class="line-chat">
@@ -712,19 +712,19 @@ footer a:hover { color: var(--white); }
   <p class="section-desc fade-in">メールを開かなくても、重要な情報が自動で届く</p>
   <div class="briefing-grid">
     <div class="briefing-card fade-in fade-in-delay-1">
-      <span class="briefing-emoji">🌅</span>
+      <span class="briefing-emoji"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="1.5"><path d="M12 3v1M12 20v1M4.22 4.22l.707.707M18.364 18.364l.707.707M1 12h1M21 12h1M4.22 19.78l.707-.707M18.364 5.636l.707-.707"/><path d="M12 8a4 4 0 0 1 0 8 4 4 0 0 1 0-8"/><path d="M3 16h18" stroke-linecap="round"/></svg></span>
       <p class="briefing-time">朝 8:00</p>
       <h3 class="briefing-title">モーニングブリーフィング</h3>
       <p class="briefing-desc">今日の要対応メール＋カレンダー予定をまとめて報告</p>
     </div>
     <div class="briefing-card fade-in fade-in-delay-2">
-      <span class="briefing-emoji">☀️</span>
+      <span class="briefing-emoji"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="1.5"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg></span>
       <p class="briefing-time">昼 12:00</p>
       <h3 class="briefing-title">午前中の新着チェック</h3>
       <p class="briefing-desc">午前中に届いた新着メールがあれば報告</p>
     </div>
     <div class="briefing-card fade-in fade-in-delay-3">
-      <span class="briefing-emoji">🌆</span>
+      <span class="briefing-emoji"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="1.5"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></span>
       <p class="briefing-time">夜 18:00</p>
       <h3 class="briefing-title">イブニングまとめ</h3>
       <p class="briefing-desc">未対応メールのまとめ＋明日の予定を報告</p>
@@ -739,23 +739,23 @@ footer a:hover { color: var(--white); }
   <p class="section-desc fade-in">重要なものだけ、あなたに届ける</p>
   <div class="classify-grid">
     <div class="classify-card fade-in fade-in-delay-1">
-      <span class="classify-emoji">⚠️</span>
-      <h3 class="classify-name">⚠️ 要返信</h3>
+      <span class="classify-emoji"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg></span>
+      <h3 class="classify-name">要返信</h3>
       <p class="classify-desc">未返信で対応が必要なメールを優先度順に報告</p>
     </div>
     <div class="classify-card fade-in fade-in-delay-2">
-      <span class="classify-emoji">📌</span>
-      <h3 class="classify-name">📌 フォローアップ</h3>
+      <span class="classify-emoji"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
+      <h3 class="classify-name">フォローアップ</h3>
       <p class="classify-desc">自分が送ったメールで返信待ちが3日以上のものを検出</p>
     </div>
     <div class="classify-card fade-in fade-in-delay-3">
-      <span class="classify-emoji">📋</span>
-      <h3 class="classify-name">📋 新着FYI</h3>
+      <span class="classify-emoji"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></span>
+      <h3 class="classify-name">新着FYI</h3>
       <p class="classify-desc">読むだけでOKな情報共有・通知は件数だけ報告</p>
     </div>
     <div class="classify-card fade-in fade-in-delay-4">
-      <span class="classify-emoji">🚫</span>
-      <h3 class="classify-name">🚫 ノイズ除外</h3>
+      <span class="classify-emoji"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="m9 12 2 2 4-4"/></svg></span>
+      <h3 class="classify-name">ノイズ除外</h3>
       <p class="classify-desc">マーケティングや自動通知は自動でスキップ</p>
     </div>
   </div>
@@ -769,24 +769,24 @@ footer a:hover { color: var(--white); }
   <div class="steps-grid">
     <div class="step-card fade-in fade-in-delay-1">
       <span class="step-num">1</span>
-      <span class="step-emoji">📩</span>
+      <span class="step-emoji"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg></span>
       <h3 class="step-title">LINEに通知が届く</h3>
       <p class="step-desc">AIが未読メールを自動チェック。重要なものだけ要約して届けます。</p>
       <div class="step-bubble">「田中さんから未返信3日。返信しますか？」</div>
     </div>
     <div class="step-card fade-in fade-in-delay-2">
       <span class="step-num">2</span>
-      <span class="step-emoji">💬</span>
+      <span class="step-emoji"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
       <h3 class="step-title">返信を指示する</h3>
       <p class="step-desc">返信したい内容を伝えるだけ。AIが丁寧な文案を作成します。</p>
       <div class="step-bubble">「承諾の方向で返信して」→ 文案が届く</div>
     </div>
     <div class="step-card fade-in fade-in-delay-3">
       <span class="step-num">3</span>
-      <span class="step-emoji">✅</span>
+      <span class="step-emoji"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span>
       <h3 class="step-title">OKで送信完了</h3>
       <p class="step-desc">文案を確認して「OK」と送るだけ。メールアプリは不要です。</p>
-      <div class="step-bubble">「OK」→ 送信完了 ✉️</div>
+      <div class="step-bubble">「OK」→ 送信完了</div>
     </div>
   </div>
 </section>

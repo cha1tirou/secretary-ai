@@ -382,6 +382,27 @@ export function checkSendLimit(userId: string, plan: string): {
   return { allowed: used < limit, used, limit };
 }
 
+// ── Timers ──
+
+export function createTimer(lineUserId: string, fireAt: string, message: string): void {
+  getDb()
+    .prepare("INSERT INTO timers (line_user_id, fire_at, message) VALUES (?, ?, ?)")
+    .run(lineUserId, fireAt, message);
+}
+
+export function getPendingTimers(): Array<{ id: number; lineUserId: string; fireAt: string; message: string }> {
+  return getDb()
+    .prepare(
+      `SELECT id, line_user_id AS lineUserId, fire_at AS fireAt, message
+       FROM timers WHERE done = 0 ORDER BY fire_at ASC`,
+    )
+    .all() as Array<{ id: number; lineUserId: string; fireAt: string; message: string }>;
+}
+
+export function markTimerDone(id: number): void {
+  getDb().prepare("UPDATE timers SET done = 1 WHERE id = ?").run(id);
+}
+
 // ── Briefing Items ──
 
 export function saveBriefingItems(lineUserId: string, items: BriefingItem[]): void {

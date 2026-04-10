@@ -1,6 +1,6 @@
-import { getUnreadEmails, getAllEmails, sendReply } from "../integrations/gmail.js";
+import { getUnreadEmails, getAllEmails, sendReply, getAttachment, getMessageWithAttachments } from "../integrations/gmail.js";
 import { getWeekEvents, createEvent } from "../integrations/gcal.js";
-import { getDb } from "../db/queries.js";
+import { getDb, createTimer } from "../db/queries.js";
 
 function ensureMemoryTable(): void {
   getDb().exec(`
@@ -39,10 +39,17 @@ export async function executeTool(
 
     case "gmail_get_message": {
       const messageId = input["message_id"] as string;
-      const emails = await getAllEmails(userId, 50);
-      const email = emails.find((e) => e.id === messageId);
-      if (!email) return "指定されたメールが見つかりません。";
-      return `件名: ${email.subject}\n送信者: ${email.from}\n宛先: ${email.to}\nCC: ${email.cc}\n日時: ${email.date}\n\n${email.body}`;
+      const msg = await getMessageWithAttachments(userId, messageId);
+      if (!msg) return "指定されたメールが見つかりません。";
+      let result = `件名: ${msg.subject}\n送信者: ${msg.from}\n宛先: ${msg.to}\nCC: ${msg.cc}\n日時: ${msg.date}\n\n${msg.body}`;
+      if (msg.attachments.length > 0) {
+        result += "\n\n--- 添付ファイル ---";
+        for (const att of msg.attachments) {
+          result += `\nファイル名: ${att.filename}\nMIMEタイプ: ${att.mimeType}\nサイズ: ${Math.round(att.size / 1024)}KB\n添付ID: ${att.attachmentId}`;
+        }
+        result += "\n\n※ gmail_get_attachment ツールで添付ファイルの内容を解析できます。";
+      }
+      return result;
     }
 
     case "gmail_send": {
@@ -97,6 +104,89 @@ export async function executeTool(
         )
         .run(userId, key, value);
       return `「${key}」を保存しました。`;
+    }
+
+    case "gmail_get_attachment": {
+      const messageId = input["message_id"] as string;
+      const attachmentId = input["attachment_id"] as string;
+      const filename = input["filename"] as string;
+      const mimeType = input["mime_type"] as string;
+
+      const attachmentData = await getAttachment(userId, messageId, attachmentId);
+      if (!attachmentData) {
+        return "添付ファイルの取得に失敗しました。";
+      }
+
+      const buffer = Buffer.from(attachmentData, "base64url");
+      const base64 = buffer.toString("base64");
+
+      const Anthropic = (await import("@anthropic-ai/sdk")).default;
+      const anthropic = new Anthropic();
+
+      if (mimeType.startsWith("image/")) {
+        const response = await anthropic.messages.create({
+          model: "claude-sonnet-4-6",
+          max_tokens: 1024,
+          messages: [{
+            role: "user",
+            content: [
+              {
+                type: "image",
+                source: {
+                  type: "base64",
+                  media_type: mimeType as "image/jpeg" | "image/png" | "image/gif" | "image/webp",
+                  data: base64,
+                },
+              },
+              {
+                type: "text",
+                text: "この添付ファイルの内容を日本語で要約してください。契約書・請求書・見積書などのビジネス文書であれば、金額・日付・担当者・重要な条件などを箇条書きで抽出してください。",
+              },
+            ],
+          }],
+        });
+        const block = response.content[0];
+        return block && block.type === "text" ? block.text : "解析できませんでした。";
+      } else if (mimeType === "application/pdf") {
+        try {
+          const pdfParse = (await import("pdf-parse")).default;
+          const pdfData = await pdfParse(buffer);
+          const text = pdfData.text.slice(0, 8000);
+
+          const response = await anthropic.messages.create({
+            model: "claude-sonnet-4-6",
+            max_tokens: 1024,
+            messages: [{
+              role: "user",
+              content: `以下のPDF（${filename}）の内容を日本語で要約してください。ビジネス文書であれば重要な情報（金額・日付・条件など）を箇条書きで抽出してください。\n\n${text}`,
+            }],
+          });
+          const block = response.content[0];
+          return block && block.type === "text" ? block.text : "解析できませんでした。";
+        } catch {
+          return "PDFの解析に失敗しました。画像形式で共有していただくと解析できる場合があります。";
+        }
+      } else {
+        return `${filename} は現在対応していない形式です（${mimeType}）。PDF または画像ファイルに対応しています。`;
+      }
+    }
+
+    case "set_timer": {
+      const minutes = input["minutes"] as number;
+      const message = input["message"] as string;
+
+      if (minutes < 1 || minutes > 10080) {
+        return "タイマーは1分〜7日の範囲で設定できます。";
+      }
+
+      const fireAt = new Date(Date.now() + minutes * 60 * 1000).toISOString();
+      createTimer(userId, fireAt, message);
+
+      const display = minutes >= 60
+        ? `${Math.floor(minutes / 60)}時間${minutes % 60 > 0 ? (minutes % 60) + "分" : ""}`
+        : `${minutes}分`;
+
+      return `⏰ ${display}後にお知らせします！\n「${message}」`;
     }
 
     default:

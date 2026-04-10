@@ -77,6 +77,15 @@ CREATE TABLE IF NOT EXISTS monthly_send_count (
   PRIMARY KEY (user_id, year_month)
 );
 
+CREATE TABLE IF NOT EXISTS timers (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  line_user_id  TEXT NOT NULL,
+  fire_at       TEXT NOT NULL,
+  message       TEXT NOT NULL,
+  done          INTEGER DEFAULT 0,
+  created_at    TEXT DEFAULT (datetime('now','localtime'))
+);
+
 CREATE TABLE IF NOT EXISTS briefing_items (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
   line_user_id  TEXT NOT NULL,

@@ -86,6 +86,50 @@ export const tools: Tool[] = [
     },
   },
   {
+    name: "gmail_get_attachment",
+    description: "メールの添付ファイルを取得して内容を解析します。PDFや画像ファイルに対応。gmail_get_messageで添付ファイルのIDを確認してから使ってください。",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        message_id: {
+          type: "string",
+          description: "メールのID",
+        },
+        attachment_id: {
+          type: "string",
+          description: "添付ファイルのID",
+        },
+        filename: {
+          type: "string",
+          description: "添付ファイルのファイル名",
+        },
+        mime_type: {
+          type: "string",
+          description: "添付ファイルのMIMEタイプ（例: application/pdf, image/jpeg）",
+        },
+      },
+      required: ["message_id", "attachment_id", "filename", "mime_type"],
+    },
+  },
+  {
+    name: "set_timer",
+    description: "タイマーをセットします。指定した分数後にLINEでリマインド通知を送ります。",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        minutes: {
+          type: "number",
+          description: "何分後にリマインドするか（1〜10080分 = 最大7日）",
+        },
+        message: {
+          type: "string",
+          description: "リマインド時に表示するメッセージ",
+        },
+      },
+      required: ["minutes", "message"],
+    },
+  },
+  {
     name: "memory_get",
     description: "ユーザーが保存したメモを取得します。",
     input_schema: {

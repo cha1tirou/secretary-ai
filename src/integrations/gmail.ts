@@ -531,6 +531,75 @@ export async function checkMyReplyExists(
   }
 }
 
+/** 添付ファイルのbase64urlデータを取得 */
+export async function getAttachment(
+  userId: string,
+  messageId: string,
+  attachmentId: string,
+): Promise<string | null> {
+  try {
+    const gmail = await getGmailClient(userId);
+    const res = await gmail.users.messages.attachments.get({
+      userId: "me",
+      messageId,
+      id: attachmentId,
+    });
+    return res.data.data ?? null;
+  } catch (err) {
+    console.error("[gmail] getAttachment error:", err);
+    return null;
+  }
+}
+
+/** メールを取得し、添付ファイル情報も含めて返す */
+export async function getMessageWithAttachments(
+  userId: string,
+  messageId: string,
+): Promise<{ body: string; subject: string; from: string; to: string; cc: string; date: string; attachments: Array<{ attachmentId: string; filename: string; mimeType: string; size: number }> } | null> {
+  try {
+    const gmail = await getGmailClient(userId);
+    const msg = await gmail.users.messages.get({
+      userId: "me",
+      id: messageId,
+      format: "full",
+    });
+
+    const headers = msg.data.payload?.headers ?? [];
+    const body = extractBody(msg.data.payload);
+
+    // 添付ファイル情報を収集
+    const attachments: Array<{ attachmentId: string; filename: string; mimeType: string; size: number }> = [];
+    function findAttachments(parts: any[] | undefined) {
+      if (!parts) return;
+      for (const part of parts) {
+        if (part.body?.attachmentId && part.filename) {
+          attachments.push({
+            attachmentId: part.body.attachmentId,
+            filename: part.filename,
+            mimeType: part.mimeType ?? "application/octet-stream",
+            size: part.body.size ?? 0,
+          });
+        }
+        if (part.parts) findAttachments(part.parts);
+      }
+    }
+    findAttachments(msg.data.payload?.parts);
+
+    return {
+      body: body.slice(0, 2000),
+      subject: extractHeader(headers, "Subject"),
+      from: extractHeader(headers, "From"),
+      to: extractHeader(headers, "To"),
+      cc: extractHeader(headers, "Cc"),
+      date: extractHeader(headers, "Date"),
+      attachments,
+    };
+  } catch (err) {
+    console.error("[gmail] getMessageWithAttachments error:", err);
+    return null;
+  }
+}
+
 export async function sendAdminNotificationEmail(
   adminEmail: string,
   applicantName: string,

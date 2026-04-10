@@ -2,7 +2,7 @@ import Database from "better-sqlite3";
 import { readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { User, GoogleAccount, PendingReply, Plan } from "../types.js";
+import type { User, GoogleAccount, PendingReply, BriefingItem, Plan } from "../types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -380,6 +380,37 @@ export function checkSendLimit(userId: string, plan: string): {
   const limit = SEND_LIMITS[plan] ?? SEND_LIMITS["free"]!;
   const used = getMonthlySendCount(userId);
   return { allowed: used < limit, used, limit };
+}
+
+// ── Briefing Items ──
+
+export function saveBriefingItems(lineUserId: string, items: BriefingItem[]): void {
+  const stmt = getDb().prepare(
+    `INSERT INTO briefing_items (line_user_id, number, email_id, thread_id, type, summary)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+  );
+  const insertMany = getDb().transaction((rows: BriefingItem[]) => {
+    for (const item of rows) {
+      stmt.run(lineUserId, item.number, item.emailId, item.threadId, item.type, item.summary);
+    }
+  });
+  insertMany(items);
+}
+
+export function getBriefingItem(lineUserId: string, number: number): BriefingItem | null {
+  const row = getDb()
+    .prepare(
+      `SELECT line_user_id AS lineUserId, number, email_id AS emailId,
+              thread_id AS threadId, type, summary
+       FROM briefing_items WHERE line_user_id = ? AND number = ?
+       ORDER BY created_at DESC LIMIT 1`,
+    )
+    .get(lineUserId, number) as BriefingItem | undefined;
+  return row ?? null;
+}
+
+export function clearBriefingItems(lineUserId: string): void {
+  getDb().prepare("DELETE FROM briefing_items WHERE line_user_id = ?").run(lineUserId);
 }
 
 // ── Email Cache ──

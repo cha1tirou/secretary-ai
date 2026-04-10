@@ -48,6 +48,15 @@ export type GoogleAccount = {
   createdAt: string;
 };
 
+export type BriefingItem = {
+  lineUserId: string;
+  number: number;
+  emailId: string;
+  threadId: string;
+  type: "reply_needed" | "followup" | "fyi";
+  summary: string;
+};
+
 export type PendingReply = {
   id: number;
   userId: string;

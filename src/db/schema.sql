@@ -77,6 +77,17 @@ CREATE TABLE IF NOT EXISTS monthly_send_count (
   PRIMARY KEY (user_id, year_month)
 );
 
+CREATE TABLE IF NOT EXISTS briefing_items (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  line_user_id  TEXT NOT NULL,
+  number        INTEGER NOT NULL,
+  email_id      TEXT NOT NULL,
+  thread_id     TEXT NOT NULL,
+  type          TEXT NOT NULL CHECK(type IN ('reply_needed','followup','fyi')),
+  summary       TEXT NOT NULL,
+  created_at    TEXT DEFAULT (datetime('now','localtime'))
+);
+
 CREATE TABLE IF NOT EXISTS email_cache (
   message_id  TEXT NOT NULL,
   user_id     TEXT NOT NULL,

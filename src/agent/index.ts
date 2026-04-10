@@ -7,6 +7,7 @@ import type {
 } from "@anthropic-ai/sdk/resources/messages.js";
 import { tools } from "./tools.js";
 import { executeTool } from "./executor.js";
+import { getBriefingItem } from "../db/queries.js";
 
 const SYSTEM_PROMPT = (userName: string) =>
   `あなたはAI秘書サービスのアシスタントです。
@@ -24,7 +25,63 @@ GmailとGoogleカレンダーを使って、以下の業務を行います：
 - LINEで読みやすいよう短くまとめる（箇条書き活用）
 - 優先度が高いメールは明確に「⚠️ 要対応」と表示`;
 
+function parseCircledNumber(s: string): number {
+  const circled = "①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳";
+  const idx = circled.indexOf(s);
+  if (idx >= 0) return idx + 1;
+  return parseInt(s, 10);
+}
+
 export async function runAgent(
+  userId: string,
+  userMessage: string,
+  userName: string,
+): Promise<string> {
+  // 数字入力の検知（1〜20、①〜⑳）
+  const numMatch = userMessage
+    .trim()
+    .match(/^([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳]|1[0-9]?|20|[2-9])$/);
+  if (numMatch) {
+    const num = parseCircledNumber(numMatch[1]!);
+    const item = getBriefingItem(userId, num);
+
+    if (!item) {
+      return `${num}番のアイテムが見つかりません。\n最新のブリーフィングで表示された番号を入力してください。`;
+    }
+
+    const detailPrompt = `ユーザーが番号 ${num} を選択しました。
+対象メール: ${item.summary}
+メールID: ${item.emailId}
+
+このメールの内容をgmail_get_messageで取得して、
+内容を理解した上で以下を実施してください：
+
+1. メールの内容を2-3行で要約
+2. このメールに対して取りうる行動を a) b) c) の形式で提案
+   ※ メール内容に応じて動的に提案すること
+   （例：日程調整メールなら「a) カレンダーを確認して候補を返信」
+         見積もり確認なら「a) 承諾 b) 修正依頼 c) 検討中と伝える」
+         質問メールなら「a) ○○と回答する b) 確認してから返信する」）
+
+LINEで読みやすく、簡潔に。`;
+
+    return await runAgentLoop(userId, detailPrompt, userName);
+  }
+
+  // 通常のAgentループ
+  return await runAgentLoop(userId, userMessage, userName);
+}
+
+/** ブリーフィング用: JSON応答を期待する場合に使う */
+export async function runAgentRaw(
+  userId: string,
+  userMessage: string,
+  userName: string,
+): Promise<string> {
+  return await runAgentLoop(userId, userMessage, userName);
+}
+
+async function runAgentLoop(
   userId: string,
   userMessage: string,
   userName: string,
@@ -45,7 +102,7 @@ export async function runAgent(
   while (true) {
     const response = await client.messages.create({
       model: "claude-sonnet-4-6",
-      max_tokens: 1024,
+      max_tokens: 2048,
       system: [
         {
           type: "text",

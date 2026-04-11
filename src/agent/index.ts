@@ -4,10 +4,24 @@ import type {
   ContentBlockParam,
   ToolResultBlockParam,
   ToolUseBlock,
+  ImageBlockParam,
+  DocumentBlockParam,
+  TextBlockParam,
 } from "@anthropic-ai/sdk/resources/messages.js";
 import { tools } from "./tools.js";
 import { executeTool } from "./executor.js";
 import { getBriefingItem } from "../db/queries.js";
+
+export type Attachment = {
+  type: "image";
+  mediaType: "image/jpeg" | "image/png" | "image/gif" | "image/webp";
+  base64: string;
+} | {
+  type: "document";
+  mediaType: "application/pdf";
+  base64: string;
+  fileName: string;
+};
 
 const SYSTEM_PROMPT = (userName: string) =>
   `あなたはAI秘書サービスのアシスタントです。
@@ -47,6 +61,7 @@ export async function runAgent(
   userId: string,
   userMessage: string,
   userName: string,
+  attachments?: Attachment[],
 ): Promise<string> {
   // 数字入力の検知（1〜20、①〜⑳）
   const numMatch = userMessage
@@ -80,7 +95,7 @@ LINEで読みやすく、簡潔に。`;
   }
 
   // 通常のAgentループ
-  return await runAgentLoop(userId, userMessage, userName);
+  return await runAgentLoop(userId, userMessage, userName, attachments);
 }
 
 /** ブリーフィング用: JSON応答を期待する場合に使う */
@@ -96,11 +111,35 @@ async function runAgentLoop(
   userId: string,
   userMessage: string,
   userName: string,
+  attachments?: Attachment[],
 ): Promise<string> {
   const client = new Anthropic();
 
+  // 添付ファイルがある場合はマルチコンテンツブロックで送信
+  let userContent: string | (TextBlockParam | ImageBlockParam | DocumentBlockParam)[];
+  if (attachments && attachments.length > 0) {
+    const blocks: (TextBlockParam | ImageBlockParam | DocumentBlockParam)[] = [];
+    for (const att of attachments) {
+      if (att.type === "image") {
+        blocks.push({
+          type: "image",
+          source: { type: "base64", media_type: att.mediaType, data: att.base64 },
+        });
+      } else if (att.type === "document") {
+        blocks.push({
+          type: "document",
+          source: { type: "base64", media_type: att.mediaType, data: att.base64 },
+        });
+      }
+    }
+    blocks.push({ type: "text", text: userMessage });
+    userContent = blocks;
+  } else {
+    userContent = userMessage;
+  }
+
   const messages: MessageParam[] = [
-    { role: "user", content: userMessage },
+    { role: "user", content: userContent },
   ];
 
   // cache_control を最後のツールに付与

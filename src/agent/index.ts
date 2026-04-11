@@ -9,7 +9,7 @@ import type {
 } from "@anthropic-ai/sdk/resources/messages.js";
 import { tools } from "./tools.js";
 import { executeTool } from "./executor.js";
-import { getBriefingItem } from "../db/queries.js";
+import { getBriefingItem, addConversation, getRecentConversations } from "../db/queries.js";
 
 export type Attachment = {
   type: "image";
@@ -156,9 +156,14 @@ async function runAgentLoop(
     userContent = userMessage;
   }
 
+  // 会話履歴を取得してコンテキストに含める
+  const history = getRecentConversations(userId, 10);
   const messages: MessageParam[] = [
+    ...history.map((h) => ({ role: h.role, content: h.content }) as MessageParam),
     { role: "user", content: userContent },
   ];
+
+  addConversation(userId, "user", userMessage);
 
   // cache_control を最後のツールに付与
   const cachedTools = tools.map((tool, i) =>
@@ -185,7 +190,9 @@ async function runAgentLoop(
     // tool_use でなければ最終応答を返す
     if (response.stop_reason !== "tool_use") {
       const textBlocks = response.content.filter((b) => b.type === "text");
-      return textBlocks.map((b) => b.text).join("\n") || "処理が完了しました。";
+      const reply = textBlocks.map((b) => b.text).join("\n") || "処理が完了しました。";
+      addConversation(userId, "assistant", reply);
+      return reply;
     }
 
     // tool_use ブロックを処理

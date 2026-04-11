@@ -62,13 +62,18 @@ export function startEmailWatchCron() {
               !isEmailWatchNotified(rule.id, email.id)
             ) {
               const from = (email.from.split("<")[0] ?? "").trim() || email.from;
-              await client.pushMessage({
-                to: userId,
-                messages: [{
-                  type: "text",
-                  text: `📩 メール通知: ${rule.description}\n\n件名: ${email.subject}\n送信者: ${from}\n日時: ${email.date}`,
-                }],
-              });
+              console.log(`[emailWatch] match: rule=${rule.id}(${rule.matchType}:${rule.pattern}) email=${email.id} from="${from}" subject="${email.subject}"`);
+              try {
+                await client.pushMessage({
+                  to: userId,
+                  messages: [{
+                    type: "text",
+                    text: `📩 メール通知: ${rule.description}\n\n件名: ${email.subject}\n送信者: ${from}\n日時: ${email.date}`,
+                  }],
+                });
+              } catch (pushErr) {
+                console.error(`[emailWatch] push error for rule=${rule.id}:`, pushErr);
+              }
               markEmailWatchNotified(rule.id, email.id);
             }
           }

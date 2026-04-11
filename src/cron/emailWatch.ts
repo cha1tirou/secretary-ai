@@ -64,9 +64,12 @@ export function startEmailWatchCron() {
     for (const [userId, userRules] of rulesByUser) {
       try {
         const emails = await getUnreadEmails(userId);
+        let rateLimited = false;
 
         for (const rule of userRules) {
+          if (rateLimited) break;
           for (const email of emails) {
+            if (rateLimited) break;
             if (
               emailMatchesRule(email, rule.matchType, rule.pattern, rule.pattern2) &&
               !isEmailWatchNotified(rule.id, email.id)
@@ -81,10 +84,17 @@ export function startEmailWatchCron() {
                     text: `📩 メール通知: ${rule.description}\n\n件名: ${email.subject}\n送信者: ${from}\n日時: ${email.date}`,
                   }],
                 });
+                markEmailWatchNotified(rule.id, email.id);
               } catch (pushErr) {
-                console.error(`[emailWatch] push error for rule=${rule.id}:`, pushErr);
+                const errMsg = pushErr instanceof Error ? pushErr.message : String(pushErr);
+                if (errMsg.includes("429") || errMsg.includes("monthly limit")) {
+                  console.warn(`[emailWatch] LINE push rate limited for ${userId}, skipping remaining`);
+                  rateLimited = true;
+                } else {
+                  console.error(`[emailWatch] push error for rule=${rule.id}:`, pushErr);
+                }
+                markEmailWatchNotified(rule.id, email.id);
               }
-              markEmailWatchNotified(rule.id, email.id);
             }
           }
         }

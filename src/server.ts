@@ -8,6 +8,7 @@ import { webhook } from "./handlers/webhook.js";
 import { auth } from "./integrations/auth.js";
 import { startBriefing } from "./cron/briefing.js";
 import { startTimerCron } from "./cron/timer.js";
+import { startEmailWatchCron } from "./cron/emailWatch.js";
 
 const app = new Hono();
 
@@ -21,6 +22,7 @@ initDb();
 // cron起動
 startBriefing();
 startTimerCron();
+startEmailWatchCron();
 
 // ヘルスチェック
 app.get("/health", (c) => c.json({ status: "ok" }));

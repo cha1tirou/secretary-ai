@@ -1,6 +1,6 @@
 import { getUnreadEmails, getAllEmails, sendReply, getAttachment, getMessageWithAttachments } from "../integrations/gmail.js";
 import { getWeekEvents, createEvent } from "../integrations/gcal.js";
-import { getDb, createTimer } from "../db/queries.js";
+import { getDb, createTimer, createEmailWatchRule, getActiveEmailWatchRules, deleteEmailWatchRule } from "../db/queries.js";
 
 function ensureMemoryTable(): void {
   getDb().exec(`
@@ -188,6 +188,30 @@ export async function executeTool(
         : `${minutes}分`;
 
       return `⏰ ${display}後にお知らせします！\n「${message}」`;
+    }
+
+    case "email_watch_create": {
+      const matchType = input["match_type"] as "from" | "subject" | "keyword";
+      const pattern = input["pattern"] as string;
+      const description = input["description"] as string;
+      const id = createEmailWatchRule(userId, matchType, pattern, description);
+      return `メール監視ルールを作成しました（ID: ${id}）\n条件: ${description}\n新着メールが条件に合致したらLINEでお知らせします。`;
+    }
+
+    case "email_watch_list": {
+      const rules = getActiveEmailWatchRules(userId);
+      if (rules.length === 0) return "現在有効なメール監視ルールはありません。";
+      return rules
+        .map((r) => `ID: ${r.id} | ${r.description}\n  タイプ: ${r.matchType} | パターン: ${r.pattern}`)
+        .join("\n---\n");
+    }
+
+    case "email_watch_delete": {
+      const ruleId = input["rule_id"] as number;
+      const deleted = deleteEmailWatchRule(userId, ruleId);
+      return deleted
+        ? `ルール（ID: ${ruleId}）を削除しました。`
+        : `ルール（ID: ${ruleId}）が見つかりません。`;
     }
 
     default:

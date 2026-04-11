@@ -161,4 +161,50 @@ export const tools: Tool[] = [
       required: ["key", "value"],
     },
   },
+  {
+    name: "email_watch_create",
+    description: "メール監視ルールを作成します。条件に合致するメールが届いたらLINEで通知します。",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        match_type: {
+          type: "string",
+          enum: ["from", "subject", "keyword"],
+          description: "マッチ対象: from=送信者, subject=件名, keyword=全体（送信者・件名・本文）",
+        },
+        pattern: {
+          type: "string",
+          description: "マッチする文字列（部分一致、例: tanaka, 田中, 請求書）",
+        },
+        description: {
+          type: "string",
+          description: "ルールの説明（例: 田中さんからのメール）",
+        },
+      },
+      required: ["match_type", "pattern", "description"],
+    },
+  },
+  {
+    name: "email_watch_list",
+    description: "現在有効なメール監視ルールの一覧を表示します。",
+    input_schema: {
+      type: "object" as const,
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: "email_watch_delete",
+    description: "メール監視ルールを削除します。",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        rule_id: {
+          type: "number",
+          description: "削除するルールのID（email_watch_listで確認）",
+        },
+      },
+      required: ["rule_id"],
+    },
+  },
 ];

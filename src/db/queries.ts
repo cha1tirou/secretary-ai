@@ -491,6 +491,64 @@ export function getResetDate(): string {
   return `${d.getMonth() + 1}\u67081\u65E5`;
 }
 
+// ── Email Watch Rules ──
+
+export function createEmailWatchRule(
+  userId: string,
+  matchType: "from" | "subject" | "keyword",
+  pattern: string,
+  description: string,
+): number {
+  const result = getDb()
+    .prepare(
+      `INSERT INTO email_watch_rules (user_id, match_type, pattern, description)
+       VALUES (?, ?, ?, ?)`,
+    )
+    .run(userId, matchType, pattern, description);
+  return Number(result.lastInsertRowid);
+}
+
+export function getActiveEmailWatchRules(
+  userId: string,
+): Array<{ id: number; matchType: string; pattern: string; description: string; createdAt: string }> {
+  return getDb()
+    .prepare(
+      `SELECT id, match_type AS matchType, pattern, description, created_at AS createdAt
+       FROM email_watch_rules WHERE user_id = ? AND active = 1 ORDER BY created_at DESC`,
+    )
+    .all(userId) as Array<{ id: number; matchType: string; pattern: string; description: string; createdAt: string }>;
+}
+
+export function getAllActiveEmailWatchRules(): Array<{
+  id: number; userId: string; matchType: string; pattern: string; description: string;
+}> {
+  return getDb()
+    .prepare(
+      `SELECT id, user_id AS userId, match_type AS matchType, pattern, description
+       FROM email_watch_rules WHERE active = 1`,
+    )
+    .all() as Array<{ id: number; userId: string; matchType: string; pattern: string; description: string }>;
+}
+
+export function deleteEmailWatchRule(userId: string, ruleId: number): boolean {
+  const result = getDb()
+    .prepare("UPDATE email_watch_rules SET active = 0 WHERE id = ? AND user_id = ?")
+    .run(ruleId, userId);
+  return result.changes > 0;
+}
+
+export function isEmailWatchNotified(ruleId: number, messageId: string): boolean {
+  return getDb()
+    .prepare("SELECT 1 FROM email_watch_notified WHERE rule_id = ? AND message_id = ?")
+    .get(ruleId, messageId) !== undefined;
+}
+
+export function markEmailWatchNotified(ruleId: number, messageId: string): void {
+  getDb()
+    .prepare("INSERT OR IGNORE INTO email_watch_notified (rule_id, message_id) VALUES (?, ?)")
+    .run(ruleId, messageId);
+}
+
 // ── 直接実行でDB初期化 ──
 
 if (process.argv[1] && resolve(process.argv[1]) === resolve(__dirname, "queries.ts")) {

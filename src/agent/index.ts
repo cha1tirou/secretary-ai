@@ -47,6 +47,12 @@ GmailとGoogleカレンダーを使って、以下の業務を行います：
   gmail_get_attachmentで解析する
 - 対応形式: PDF、画像（JPEG/PNG等）
 
+## メール監視
+- 「〇〇からメールが来たら教えて」「請求書のメールが届いたら通知して」→ email_watch_create を使う
+- match_type の選び方: 人名・メールアドレス → "from"、件名キーワード → "subject"、全般 → "keyword"
+- pattern にはメールアドレス・名前・キーワードを設定（部分一致）
+- 「監視ルール一覧」→ email_watch_list、「監視やめて」→ email_watch_delete
+
 ## タイマー
 - 「〇分後にリマインドして」「〇時間後に教えて」などはset_timerツールを使う
 - 「田中さんへの返信を30分後に思い出させて」→ message は「田中さんへの返信」にする

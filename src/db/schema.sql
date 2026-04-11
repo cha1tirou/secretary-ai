@@ -104,3 +104,20 @@ CREATE TABLE IF NOT EXISTS email_cache (
   cached_at   TEXT DEFAULT (datetime('now', 'localtime')),
   PRIMARY KEY (message_id, user_id)
 );
+
+CREATE TABLE IF NOT EXISTS email_watch_rules (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id       TEXT NOT NULL,
+  match_type    TEXT NOT NULL CHECK(match_type IN ('from','subject','keyword')),
+  pattern       TEXT NOT NULL,
+  description   TEXT NOT NULL,
+  active        INTEGER DEFAULT 1,
+  created_at    TEXT DEFAULT (datetime('now','localtime'))
+);
+
+CREATE TABLE IF NOT EXISTS email_watch_notified (
+  rule_id       INTEGER NOT NULL,
+  message_id    TEXT NOT NULL,
+  notified_at   TEXT DEFAULT (datetime('now','localtime')),
+  PRIMARY KEY (rule_id, message_id)
+);

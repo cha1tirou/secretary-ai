@@ -169,16 +169,20 @@ export const tools: Tool[] = [
       properties: {
         match_type: {
           type: "string",
-          enum: ["from", "subject", "keyword"],
-          description: "マッチ対象: from=送信者, subject=件名, keyword=全体（送信者・件名・本文）",
+          enum: ["from", "subject", "keyword", "from_and_keyword"],
+          description: "マッチ対象: from=送信者, subject=件名, keyword=全体, from_and_keyword=送信者AND件名/本文キーワード",
         },
         pattern: {
           type: "string",
-          description: "マッチする文字列（部分一致、例: tanaka, 田中, 請求書）",
+          description: "マッチする文字列（部分一致）。from_and_keywordの場合は送信者名",
+        },
+        pattern2: {
+          type: "string",
+          description: "from_and_keyword時の件名/本文キーワード（例: 売上報告、請求書）",
         },
         description: {
           type: "string",
-          description: "ルールの説明（例: 田中さんからのメール）",
+          description: "ルールの説明（例: 田中さんからの売上報告）",
         },
       },
       required: ["match_type", "pattern", "description"],

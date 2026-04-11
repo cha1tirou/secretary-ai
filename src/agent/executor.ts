@@ -191,10 +191,11 @@ export async function executeTool(
     }
 
     case "email_watch_create": {
-      const matchType = input["match_type"] as "from" | "subject" | "keyword";
+      const matchType = input["match_type"] as "from" | "subject" | "keyword" | "from_and_keyword";
       const pattern = input["pattern"] as string;
       const description = input["description"] as string;
-      const id = createEmailWatchRule(userId, matchType, pattern, description);
+      const pattern2 = input["pattern2"] as string | undefined;
+      const id = createEmailWatchRule(userId, matchType, pattern, description, pattern2);
       return `メール監視ルールを作成しました（ID: ${id}）\n条件: ${description}\n新着メールが条件に合致したらLINEでお知らせします。`;
     }
 

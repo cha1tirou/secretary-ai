@@ -66,6 +66,12 @@ export function initDb(): void {
     }
   }
 
+  // マイグレーション: email_watch_rules に pattern2 カラム追加
+  const watchCols = d.prepare("PRAGMA table_info(email_watch_rules)").all() as { name: string }[];
+  if (watchCols.length > 0 && !watchCols.some((c) => c.name === "pattern2")) {
+    d.exec("ALTER TABLE email_watch_rules ADD COLUMN pattern2 TEXT");
+  }
+
   // 起動時にemail_cacheの古いエントリを削除（7日以上前）
   d.exec(`DELETE FROM email_cache WHERE cached_at < datetime('now', '-7 days', 'localtime')`);
 }
@@ -495,39 +501,40 @@ export function getResetDate(): string {
 
 export function createEmailWatchRule(
   userId: string,
-  matchType: "from" | "subject" | "keyword",
+  matchType: "from" | "subject" | "keyword" | "from_and_keyword",
   pattern: string,
   description: string,
+  pattern2?: string,
 ): number {
   const result = getDb()
     .prepare(
-      `INSERT INTO email_watch_rules (user_id, match_type, pattern, description)
-       VALUES (?, ?, ?, ?)`,
+      `INSERT INTO email_watch_rules (user_id, match_type, pattern, description, pattern2)
+       VALUES (?, ?, ?, ?, ?)`,
     )
-    .run(userId, matchType, pattern, description);
+    .run(userId, matchType, pattern, description, pattern2 ?? null);
   return Number(result.lastInsertRowid);
 }
 
 export function getActiveEmailWatchRules(
   userId: string,
-): Array<{ id: number; matchType: string; pattern: string; description: string; createdAt: string }> {
+): Array<{ id: number; matchType: string; pattern: string; pattern2: string | null; description: string; createdAt: string }> {
   return getDb()
     .prepare(
-      `SELECT id, match_type AS matchType, pattern, description, created_at AS createdAt
+      `SELECT id, match_type AS matchType, pattern, pattern2, description, created_at AS createdAt
        FROM email_watch_rules WHERE user_id = ? AND active = 1 ORDER BY created_at DESC`,
     )
-    .all(userId) as Array<{ id: number; matchType: string; pattern: string; description: string; createdAt: string }>;
+    .all(userId) as Array<{ id: number; matchType: string; pattern: string; pattern2: string | null; description: string; createdAt: string }>;
 }
 
 export function getAllActiveEmailWatchRules(): Array<{
-  id: number; userId: string; matchType: string; pattern: string; description: string;
+  id: number; userId: string; matchType: string; pattern: string; pattern2: string | null; description: string;
 }> {
   return getDb()
     .prepare(
-      `SELECT id, user_id AS userId, match_type AS matchType, pattern, description
+      `SELECT id, user_id AS userId, match_type AS matchType, pattern, pattern2, description
        FROM email_watch_rules WHERE active = 1`,
     )
-    .all() as Array<{ id: number; userId: string; matchType: string; pattern: string; description: string }>;
+    .all() as Array<{ id: number; userId: string; matchType: string; pattern: string; pattern2: string | null; description: string }>;
 }
 
 export function deleteEmailWatchRule(userId: string, ruleId: number): boolean {

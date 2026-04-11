@@ -108,8 +108,9 @@ CREATE TABLE IF NOT EXISTS email_cache (
 CREATE TABLE IF NOT EXISTS email_watch_rules (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id       TEXT NOT NULL,
-  match_type    TEXT NOT NULL CHECK(match_type IN ('from','subject','keyword')),
+  match_type    TEXT NOT NULL CHECK(match_type IN ('from','subject','keyword','from_and_keyword')),
   pattern       TEXT NOT NULL,
+  pattern2      TEXT,
   description   TEXT NOT NULL,
   active        INTEGER DEFAULT 1,
   created_at    TEXT DEFAULT (datetime('now','localtime'))

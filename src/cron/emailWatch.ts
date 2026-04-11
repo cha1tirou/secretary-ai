@@ -18,6 +18,7 @@ function emailMatchesRule(
   email: Email,
   matchType: string,
   pattern: string,
+  pattern2?: string | null,
 ): boolean {
   const p = pattern.toLowerCase();
   switch (matchType) {
@@ -31,6 +32,15 @@ function emailMatchesRule(
         email.subject.toLowerCase().includes(p) ||
         email.body.toLowerCase().includes(p)
       );
+    case "from_and_keyword": {
+      if (!email.from.toLowerCase().includes(p)) return false;
+      if (!pattern2) return true;
+      const p2 = pattern2.toLowerCase();
+      return (
+        email.subject.toLowerCase().includes(p2) ||
+        email.body.toLowerCase().includes(p2)
+      );
+    }
     default:
       return false;
   }
@@ -58,7 +68,7 @@ export function startEmailWatchCron() {
         for (const rule of userRules) {
           for (const email of emails) {
             if (
-              emailMatchesRule(email, rule.matchType, rule.pattern) &&
+              emailMatchesRule(email, rule.matchType, rule.pattern, rule.pattern2) &&
               !isEmailWatchNotified(rule.id, email.id)
             ) {
               const from = (email.from.split("<")[0] ?? "").trim() || email.from;

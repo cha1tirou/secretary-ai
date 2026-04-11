@@ -131,9 +131,10 @@ async function runAgentLoop(
       } else if (att.type === "document") {
         // PDFはpdf-parseでテキスト抽出してからテキストブロックとして送信
         try {
-          const pdfParse = (await import("pdf-parse")).default;
+          const { PDFParse } = await import("pdf-parse");
           const buffer = Buffer.from(att.base64, "base64");
-          const pdfData = await pdfParse(buffer);
+          const parser = new PDFParse({ data: buffer });
+          const pdfData = await parser.getText();
           const pdfText = pdfData.text.slice(0, 8000);
           console.log(`[agent] PDF parsed: ${pdfText.length} chars from ${att.fileName}`);
           blocks.push({

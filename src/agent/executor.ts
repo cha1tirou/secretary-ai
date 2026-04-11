@@ -149,8 +149,9 @@ export async function executeTool(
         return block && block.type === "text" ? block.text : "解析できませんでした。";
       } else if (mimeType === "application/pdf") {
         try {
-          const pdfParse = (await import("pdf-parse")).default;
-          const pdfData = await pdfParse(buffer);
+          const { PDFParse } = await import("pdf-parse");
+          const parser = new PDFParse({ data: buffer });
+          const pdfData = await parser.getText();
           const text = pdfData.text.slice(0, 8000);
 
           const response = await anthropic.messages.create({

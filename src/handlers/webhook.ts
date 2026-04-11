@@ -216,6 +216,7 @@ webhook.post("/webhook", async (c) => {
 
       const messageEvent = event as MessageEvent;
       const msgType = event.message.type;
+      console.log(`[webhook] message type: ${msgType}`);
 
       // テキストメッセージ
       if (msgType === "text") {
@@ -227,6 +228,7 @@ webhook.post("/webhook", async (c) => {
       // 画像メッセージ
       if (msgType === "image") {
         const messageId = event.message.id;
+        console.log(`[webhook] downloading image: ${messageId}`);
         const data = await downloadLineContent(messageId);
         if (!data) {
           await client.replyMessage({
@@ -248,6 +250,7 @@ webhook.post("/webhook", async (c) => {
       if (msgType === "file") {
         const fileMsg = event.message as unknown as { id: string; fileName: string; fileSize: number };
         const ext = fileMsg.fileName.split(".").pop()?.toLowerCase() ?? "";
+        console.log(`[webhook] file received: ${fileMsg.fileName} (ext: ${ext})`);
 
         if (["jpg", "jpeg", "png", "gif", "webp"].includes(ext)) {
           const data = await downloadLineContent(fileMsg.id);

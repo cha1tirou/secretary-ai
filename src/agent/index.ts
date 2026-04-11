@@ -39,8 +39,11 @@ GmailとGoogleカレンダーを使って、以下の業務を行います：
 - 優先度が高いメールは明確に「⚠️ 要対応」と表示
 
 ## 添付ファイル読み取り
-- ユーザーが「添付ファイル」「添付を読んで」「PDFを教えて」などと言ったら、
-  まずgmail_get_messageで該当メールを取得し、添付ファイルのIDとMIMEタイプを確認してから
+- メッセージに画像やPDFのデータが直接含まれている場合があります（LINEから送られたファイル）。
+  その場合はデータがそのまま見えているので、内容を読み取って回答してください。
+- ユーザーが「添付ファイル」「添付を読んで」「PDFを教えて」などと言い、
+  メッセージに添付データが含まれていない場合は、
+  gmail_get_messageで該当メールを取得し、添付ファイルのIDとMIMEタイプを確認してから
   gmail_get_attachmentで解析する
 - 対応形式: PDF、画像（JPEG/PNG等）
 
@@ -117,6 +120,7 @@ async function runAgentLoop(
   // 添付ファイルがある場合はマルチコンテンツブロックで送信
   let userContent: string | (TextBlockParam | ImageBlockParam)[];
   if (attachments && attachments.length > 0) {
+    console.log(`[agent] attachments: ${attachments.length} items (${attachments.map(a => a.type).join(", ")})`);
     const blocks: (TextBlockParam | ImageBlockParam)[] = [];
     for (const att of attachments) {
       if (att.type === "image") {
@@ -131,6 +135,7 @@ async function runAgentLoop(
           const buffer = Buffer.from(att.base64, "base64");
           const pdfData = await pdfParse(buffer);
           const pdfText = pdfData.text.slice(0, 8000);
+          console.log(`[agent] PDF parsed: ${pdfText.length} chars from ${att.fileName}`);
           blocks.push({
             type: "text",
             text: `【添付PDF: ${att.fileName}】\n${pdfText}`,

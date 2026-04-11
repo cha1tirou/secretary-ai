@@ -5,7 +5,6 @@ import type {
   ToolResultBlockParam,
   ToolUseBlock,
   ImageBlockParam,
-  DocumentBlockParam,
   TextBlockParam,
 } from "@anthropic-ai/sdk/resources/messages.js";
 import { tools } from "./tools.js";
@@ -116,9 +115,9 @@ async function runAgentLoop(
   const client = new Anthropic();
 
   // 添付ファイルがある場合はマルチコンテンツブロックで送信
-  let userContent: string | (TextBlockParam | ImageBlockParam | DocumentBlockParam)[];
+  let userContent: string | (TextBlockParam | ImageBlockParam)[];
   if (attachments && attachments.length > 0) {
-    const blocks: (TextBlockParam | ImageBlockParam | DocumentBlockParam)[] = [];
+    const blocks: (TextBlockParam | ImageBlockParam)[] = [];
     for (const att of attachments) {
       if (att.type === "image") {
         blocks.push({
@@ -126,10 +125,23 @@ async function runAgentLoop(
           source: { type: "base64", media_type: att.mediaType, data: att.base64 },
         });
       } else if (att.type === "document") {
-        blocks.push({
-          type: "document",
-          source: { type: "base64", media_type: att.mediaType, data: att.base64 },
-        });
+        // PDFはpdf-parseでテキスト抽出してからテキストブロックとして送信
+        try {
+          const pdfParse = (await import("pdf-parse")).default;
+          const buffer = Buffer.from(att.base64, "base64");
+          const pdfData = await pdfParse(buffer);
+          const pdfText = pdfData.text.slice(0, 8000);
+          blocks.push({
+            type: "text",
+            text: `【添付PDF: ${att.fileName}】\n${pdfText}`,
+          });
+        } catch (err) {
+          console.error("[agent] PDF parse error:", err);
+          blocks.push({
+            type: "text",
+            text: `【添付PDF: ${att.fileName}】PDFのテキスト抽出に失敗しました。`,
+          });
+        }
       }
     }
     blocks.push({ type: "text", text: userMessage });

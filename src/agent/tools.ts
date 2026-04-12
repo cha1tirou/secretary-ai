@@ -48,7 +48,7 @@ export const tools: Tool[] = [
   },
   {
     name: "calendar_get_events",
-    description: "今日から7日間のカレンダー予定を取得します。",
+    description: "今日から7日間のカレンダー予定を取得します。月全体を確認したい場合は、月初から月末までの範囲を指定して複数回呼ぶか、取得できた範囲で回答しその旨（7日分までしか取れていないこと）をユーザーに伝えてください。",
     input_schema: {
       type: "object" as const,
       properties: {},
@@ -57,7 +57,7 @@ export const tools: Tool[] = [
   },
   {
     name: "calendar_create_event",
-    description: "カレンダーに予定を作成します。日時が曖昧な場合（早めに・そのうち・今度など）は必ずいつが希望かをユーザーに確認してから登録する。",
+    description: "カレンダーに予定を作成します。日時が曖昧な場合（早めに・そのうち・今度など）は必ずいつが希望かをユーザーに確認してから登録する。予定を作成する前に calendar_get_events で同じ時間帯の既存予定を確認し、start〜end が既存予定の start〜end と一部でも重なる場合（完全一致だけでなく部分的重複も含む）は、重複している予定名と時刻を伝えて追加するか確認してから作成する。",
     input_schema: {
       type: "object" as const,
       properties: {

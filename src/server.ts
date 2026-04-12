@@ -44,6 +44,12 @@ app.get("/privacy", (c) => {
   return c.html(html);
 });
 
+// プライバシーポリシー（Google OAuth審査用詳細版・日英併記）
+app.get("/privacy-policy", (c) => {
+  const html = readFileSync(join(process.cwd(), "public/privacy-policy.html"), "utf-8");
+  return c.html(html);
+});
+
 // 利用規約
 app.get("/terms", (c) => {
   const html = readFileSync(join(process.cwd(), "public/terms.html"), "utf-8");

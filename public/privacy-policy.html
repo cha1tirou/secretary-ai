@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>プライバシーポリシー / Privacy Policy — AI秘書</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0f172a;--white:#ffffff;--gray:#94a3b8;--gray-light:#cbd5e1;--green:#22c55e;--border:rgba(255,255,255,.08)}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--white);overflow-x:hidden;-webkit-font-smoothing:antialiased;line-height:1.8}
+.nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;justify-content:space-between;align-items:center;padding:0 clamp(20px,5vw,80px);height:64px;background:rgba(15,23,42,.85);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid var(--border)}
+.logo{font-weight:900;font-size:20px;letter-spacing:-.02em;text-decoration:none;color:var(--white)}
+.logo span{color:var(--green)}
+.nav-cta{font-size:13px;font-weight:700;color:var(--bg);background:var(--green);text-decoration:none;padding:8px 20px;border-radius:8px;transition:transform .2s,box-shadow .2s}
+.nav-cta:hover{transform:translateY(-1px);box-shadow:0 4px 20px rgba(34,197,94,.35)}
+.content{max-width:760px;margin:0 auto;padding:100px clamp(20px,6vw,80px) 80px}
+h1{font-size:clamp(24px,4vw,36px);font-weight:900;margin-bottom:12px}
+.updated{font-size:13px;color:var(--gray);margin-bottom:36px}
+.lang-switch{display:flex;gap:8px;margin-bottom:40px}
+.lang-switch a{display:inline-block;padding:6px 14px;border:1px solid var(--border);border-radius:6px;font-size:13px;color:var(--gray-light);text-decoration:none;transition:all .2s}
+.lang-switch a:hover{border-color:var(--green);color:var(--green)}
+h2{font-size:18px;font-weight:700;margin-top:40px;margin-bottom:12px;color:var(--green)}
+h3{font-size:15px;font-weight:700;margin-top:20px;margin-bottom:8px;color:var(--white)}
+p,li{font-size:15px;color:var(--gray-light);line-height:2}
+ul{padding-left:1.5em;margin-top:8px}
+li{margin-bottom:6px}
+a{color:var(--green);text-decoration:none}
+a:hover{text-decoration:underline}
+.divider{margin:72px 0 0;border-top:1px dashed var(--border)}
+footer{border-top:1px solid var(--border);text-align:center;padding:36px 20px;font-size:13px;color:#64748b}
+footer a{color:var(--gray);text-decoration:none;transition:color .2s}
+footer a:hover{color:var(--white)}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="logo">AI<span>秘書</span></a>
+  <a href="https://line.me/R/ti/p/@210nulgd" class="nav-cta">LINE友達追加</a>
+</nav>
+
+<div class="content">
+
+<!-- ===================== 日本語版 ===================== -->
+<section id="ja">
+  <h1>プライバシーポリシー</h1>
+  <p class="updated">最終更新日: 2026年4月12日</p>
+  <div class="lang-switch">
+    <a href="#ja">日本語</a>
+    <a href="#en">English</a>
+  </div>
+
+  <h2>1. 運営者</h2>
+  <p>AI秘書（以下「本サービス」）は、宇野想一郎（以下「運営者」）が個人で提供するLINEボット型AIアシスタントです。</p>
+
+  <h2>2. 収集するGoogleユーザーデータ</h2>
+  <p>本サービスはGoogle OAuth 2.0を通じてユーザーの同意のもと、以下のGoogleユーザーデータにアクセスします。</p>
+  <h3>Gmail（gmail.readonly / gmail.send）</h3>
+  <ul>
+    <li>メールの<strong>件名・本文・送信者・受信者・日時</strong></li>
+    <li>ユーザーの指示により送信する<strong>返信メールの内容</strong></li>
+    <li>添付ファイル（PDF・画像）の内容（ユーザーが「添付を読んで」と指示した場合のみ）</li>
+  </ul>
+  <h3>Google カレンダー（calendar）</h3>
+  <ul>
+    <li>予定の<strong>タイトル・開始/終了時刻・場所・説明</strong></li>
+    <li>ユーザーの指示により作成する<strong>新規予定の内容</strong></li>
+  </ul>
+  <h3>その他</h3>
+  <ul>
+    <li>LINE ユーザーID（LINEとGoogleアカウントを紐付けるため）</li>
+    <li>Google OAuth 2.0 アクセストークン・リフレッシュトークン</li>
+  </ul>
+
+  <h2>3. データにアクセスする主体</h2>
+  <ul>
+    <li><strong>ユーザー本人のみ</strong>がLINE経由で自身のデータにアクセスできます。他のユーザーが他人のデータを閲覧することはできません。</li>
+    <li>AI処理のため、データの一部を<strong>Anthropic PBC（Claude API提供元）</strong>に処理委託として送信します。Anthropicは
+      <a href="https://www.anthropic.com/legal/privacy" target="_blank" rel="noopener">プライバシーポリシー</a>および
+      <a href="https://www.anthropic.com/legal/commercial-terms" target="_blank" rel="noopener">API商用利用規約</a>
+      に基づき、APIで送信されたデータをモデル学習には使用しません。</li>
+    <li>運営者個人は、障害調査などの必要最小限の場合を除き、ユーザーのメール本文やカレンダー内容を閲覧しません。</li>
+    <li><strong>上記以外の第三者にデータを販売・共有・提供することは一切ありません。</strong></li>
+  </ul>
+
+  <h2>4. データの利用目的</h2>
+  <p>収集したGoogleユーザーデータは、以下のAI秘書機能を提供する目的でのみ使用します。</p>
+  <ul>
+    <li>未読メールの要約・優先度判定・重要メールのLINE通知</li>
+    <li>返信案の自動生成（送信前に必ずユーザーの明示的な許可を取得）</li>
+    <li>カレンダー予定の確認・検索・新規登録</li>
+    <li>日程調整のための空き時間提案</li>
+    <li>ユーザーが指定した条件でのメール監視と通知</li>
+  </ul>
+  <p><strong>広告配信・プロファイリング・第三者への販売・AIモデルの学習データとしての利用など、上記目的以外での利用は行いません。</strong></p>
+
+  <h2>5. データ保護方法</h2>
+  <ul>
+    <li>サービスは<strong>Railway</strong>（米国のPaaS）上でホスティングされ、すべての通信はTLS 1.2以上で暗号化されます。</li>
+    <li>OAuthトークンとユーザーデータは<strong>SQLite</strong>データベースにRailwayの永続ボリューム上で保管され、ボリュームは暗号化されます。</li>
+    <li>アクセストークンは有効期限前にリフレッシュトークンで自動更新し、不要に長期間保持しません。</li>
+    <li>メール本文やカレンダー内容は、AI処理の必要なタイミングでのみ取得し、長期保存は最小限に留めます。</li>
+    <li>運営者のみがRailwayへの管理者アクセス権を持ち、二要素認証で保護しています。</li>
+  </ul>
+
+  <h2>6. データ削除方法</h2>
+  <ul>
+    <li>LINEで「<strong>退会</strong>」「<strong>アカウント削除</strong>」と送信すると、関連するすべてのデータ（LINE ID・OAuthトークン・会話履歴・監視ルール）を<strong>即時削除</strong>します。</li>
+    <li>いつでも <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">Googleアカウントのアプリ権限</a> から本サービスのアクセス権を取り消すことができます。取り消し後、本サービスはGoogleデータにアクセスできなくなります。</li>
+    <li>特定データの開示・削除を個別に希望される場合は、下記問い合わせ先までご連絡ください。原則1週間以内に対応します。</li>
+  </ul>
+
+  <h2>7. データ保管期間</h2>
+  <ul>
+    <li>OAuthトークン: ユーザーが退会またはGoogle側で権限取消するまで</li>
+    <li>会話履歴: 最新10件のみDBに保持（以降は自動削除）</li>
+    <li>メール本文・カレンダー内容: 恒久的には保存せず、処理の都度Google APIから取得</li>
+  </ul>
+
+  <h2>8. Google API Services User Data Policy への準拠</h2>
+  <p>本サービスによるGoogleユーザーデータの取得および利用は、
+    <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener">Google API Services User Data Policy</a>
+    （Limited Useの要件を含む）に準拠します。</p>
+
+  <h2>9. ポリシーの変更</h2>
+  <p>本ポリシーを変更する場合、本ページで告知します。重大な変更の場合はLINEでも通知します。</p>
+
+  <h2>10. お問い合わせ</h2>
+  <p>本ポリシーおよびデータの取り扱いに関するお問い合わせは、以下までご連絡ください。</p>
+  <p>運営者: 宇野想一郎<br>
+     Email: <a href="mailto:cha1tirou@gmail.com">cha1tirou@gmail.com</a></p>
+</section>
+
+<hr class="divider">
+
+<!-- ===================== English ===================== -->
+<section id="en">
+  <h1 style="margin-top:48px">Privacy Policy</h1>
+  <p class="updated">Last updated: April 12, 2026</p>
+
+  <h2>1. Operator</h2>
+  <p>AI秘書 ("the Service") is a LINE-based AI assistant operated personally by Soichiro Uno ("the Operator").</p>
+
+  <h2>2. Google User Data We Collect</h2>
+  <p>Through Google OAuth 2.0 and with the user's consent, the Service accesses the following Google user data.</p>
+  <h3>Gmail (gmail.readonly / gmail.send)</h3>
+  <ul>
+    <li>Email <strong>subject, body, sender, recipient, and timestamp</strong></li>
+    <li>Contents of <strong>reply emails</strong> that the user explicitly instructs the Service to send</li>
+    <li>Attachment contents (PDF / images) — only when the user explicitly asks the Service to read the attachment</li>
+  </ul>
+  <h3>Google Calendar (calendar)</h3>
+  <ul>
+    <li>Event <strong>title, start/end time, location, and description</strong></li>
+    <li>Contents of <strong>new events</strong> the user instructs the Service to create</li>
+  </ul>
+  <h3>Other</h3>
+  <ul>
+    <li>LINE user ID (used to link a LINE account with a Google account)</li>
+    <li>Google OAuth 2.0 access and refresh tokens</li>
+  </ul>
+
+  <h2>3. Who Accesses the Data</h2>
+  <ul>
+    <li><strong>Only the user</strong> can access their own data through LINE. No other user can view another user's data.</li>
+    <li>A portion of the data is sent to <strong>Anthropic PBC</strong> (provider of the Claude API) as a sub-processor for AI inference. Per Anthropic's
+      <a href="https://www.anthropic.com/legal/privacy" target="_blank" rel="noopener">Privacy Policy</a> and
+      <a href="https://www.anthropic.com/legal/commercial-terms" target="_blank" rel="noopener">Commercial Terms</a>,
+      data sent via the API is <strong>not used to train Anthropic's models</strong>.</li>
+    <li>The Operator does not read email bodies or calendar contents except when strictly necessary for incident investigation.</li>
+    <li><strong>Data is never sold, shared, or transferred to any third party other than the above.</strong></li>
+  </ul>
+
+  <h2>4. How We Use the Data</h2>
+  <p>Google user data is used <strong>solely</strong> to provide the following AI assistant features.</p>
+  <ul>
+    <li>Summarization, prioritization, and LINE notifications of unread email</li>
+    <li>Generating reply drafts (always requires explicit user approval before sending)</li>
+    <li>Viewing, searching, and creating calendar events</li>
+    <li>Suggesting available time slots for scheduling</li>
+    <li>Watching incoming email based on user-defined rules and sending notifications</li>
+  </ul>
+  <p><strong>We do not use the data for advertising, profiling, sale to third parties, or training AI models.</strong></p>
+
+  <h2>5. Data Protection</h2>
+  <ul>
+    <li>The Service is hosted on <strong>Railway</strong> (a US-based PaaS), and all traffic is encrypted over TLS 1.2+.</li>
+    <li>OAuth tokens and user data are stored in a <strong>SQLite</strong> database on Railway's encrypted persistent volume.</li>
+    <li>Access tokens are automatically refreshed before expiration; they are not retained longer than necessary.</li>
+    <li>Email bodies and calendar contents are fetched only when needed for AI processing and are not stored long-term.</li>
+    <li>Only the Operator holds admin access to Railway, protected by two-factor authentication.</li>
+  </ul>
+
+  <h2>6. Data Deletion</h2>
+  <ul>
+    <li>Sending "<strong>退会</strong>" or "<strong>account delete</strong>" via LINE will <strong>immediately delete</strong> all related data (LINE ID, OAuth tokens, conversation history, watch rules).</li>
+    <li>You may revoke the Service's access at any time via
+      <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">Google Account permissions</a>.
+      After revocation the Service can no longer access your Google data.</li>
+    <li>For individual disclosure or deletion requests, please contact us below. We respond within one week.</li>
+  </ul>
+
+  <h2>7. Retention</h2>
+  <ul>
+    <li>OAuth tokens: until the user unsubscribes or revokes access on Google's side</li>
+    <li>Conversation history: only the latest 10 messages are kept in the DB (older entries are deleted automatically)</li>
+    <li>Email bodies and calendar contents: not stored permanently; fetched from Google APIs each time processing is needed</li>
+  </ul>
+
+  <h2>8. Compliance with Google API Services User Data Policy</h2>
+  <p>The Service's use of Google user data, including transfer to other applications, complies with
+    <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener">Google API Services User Data Policy</a>,
+    including the Limited Use requirements.</p>
+
+  <h2>9. Changes to this Policy</h2>
+  <p>If we update this policy, we will post the changes on this page. For material changes, we will also notify users via LINE.</p>
+
+  <h2>10. Contact</h2>
+  <p>For any questions about this policy or our data handling, please contact:</p>
+  <p>Operator: Soichiro Uno<br>
+     Email: <a href="mailto:cha1tirou@gmail.com">cha1tirou@gmail.com</a></p>
+</section>
+
+</div>
+
+<footer>
+  <p>&copy; 2026 AI秘書 &nbsp;&middot;&nbsp; <a href="/privacy-policy">Privacy Policy</a> &nbsp;&middot;&nbsp; <a href="/terms">利用規約</a></p>
+</footer>
+
+</body>
+</html>

@@ -57,7 +57,7 @@ export const tools: Tool[] = [
   },
   {
     name: "calendar_create_event",
-    description: "カレンダーに予定を作成します。",
+    description: "カレンダーに予定を作成します。日時が曖昧な場合（早めに・そのうち・今度など）は必ずいつが希望かをユーザーに確認してから登録する。",
     input_schema: {
       type: "object" as const,
       properties: {

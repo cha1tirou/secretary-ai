@@ -3,8 +3,9 @@ import { Hono } from "hono";
 import "dotenv/config";
 import { readFileSync, mkdirSync } from "fs";
 import { join, dirname } from "path";
-import { initDb } from "./db/queries.js";
+import { initDb, getUser } from "./db/queries.js";
 import { webhook } from "./handlers/webhook.js";
+import { runAgent } from "./agent/index.js";
 import { auth } from "./integrations/auth.js";
 import { startBriefing } from "./cron/briefing.js";
 import { startTimerCron } from "./cron/timer.js";
@@ -47,6 +48,48 @@ app.get("/privacy", (c) => {
 app.get("/terms", (c) => {
   const html = readFileSync(join(process.cwd(), "public/terms.html"), "utf-8");
   return c.html(html);
+});
+
+// テストエンドポイント（LINE署名検証なしでエージェントを直接呼び出す）
+app.post("/test", async (c) => {
+  if (process.env["ENABLE_TEST_ENDPOINT"] !== "true") {
+    return c.notFound();
+  }
+
+  let body: { userId?: string; message?: string };
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Invalid JSON" }, 400);
+  }
+
+  const { userId, message } = body;
+  if (!userId || !message) {
+    return c.json({ error: "userId and message are required" }, 400);
+  }
+
+  try {
+    const user = getUser(userId);
+    const userName = user?.displayName ?? "テストユーザー";
+
+    const response = await Promise.race([
+      runAgent(userId, message, userName),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("タイムアウト（30秒）")), 30_000),
+      ),
+    ]);
+
+    return c.json({
+      response,
+      userId,
+      message,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[test] agent error:", err);
+    return c.json({ error: msg }, 500);
+  }
 });
 
 // LINE Webhook

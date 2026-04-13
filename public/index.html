@@ -317,6 +317,133 @@ img { max-width: 100%; display: block; }
 }
 
 
+/* ── Mini LINE preview (for cards) ── */
+.mini-chat {
+  background: linear-gradient(180deg, #7494c4 0%, #8cabd9 100%);
+  border-radius: 10px;
+  padding: 10px 8px;
+  margin-bottom: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-height: 110px;
+}
+.mini-row {
+  display: flex;
+  gap: 5px;
+  align-items: flex-end;
+}
+.mini-row.user { justify-content: flex-end; }
+.mini-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #06c755;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.mini-bubble {
+  background: #fff;
+  color: #333;
+  padding: 6px 9px;
+  border-radius: 3px 10px 10px 10px;
+  font-size: 11px;
+  line-height: 1.55;
+  text-align: left;
+  box-shadow: 0 1px 2px rgba(0,0,0,.08);
+  max-width: 82%;
+}
+.mini-bubble.user {
+  background: #06c755;
+  color: #fff;
+  border-radius: 10px 3px 10px 10px;
+}
+.mini-bubble .tag-red { color: #ef4444; font-weight: 700; }
+.mini-bubble .tag-blue { color: #3b82f6; font-weight: 700; }
+.mini-bubble .tag-green { color: #22c55e; font-weight: 700; }
+.mini-bubble .tag-gray { color: #94a3b8; font-weight: 700; }
+.mini-bubble strong { font-weight: 700; }
+
+/* Time-of-day variants */
+.mini-chat.morning {
+  background: linear-gradient(180deg, #f97316 0%, #fb923c 55%, #fdba74 100%);
+}
+.mini-chat.noon {
+  background: linear-gradient(180deg, #3b82f6 0%, #60a5fa 100%);
+}
+.mini-chat.evening {
+  background: linear-gradient(180deg, #312e81 0%, #6d28d9 55%, #db2777 100%);
+}
+
+/* ── Mail preview card (for classify section) ── */
+.mail-preview {
+  background: #fff;
+  color: #1a1a1a;
+  border-radius: 10px;
+  padding: 12px 14px 12px 20px;
+  margin-bottom: 18px;
+  position: relative;
+  overflow: hidden;
+  min-height: 110px;
+  box-shadow: 0 6px 24px rgba(0,0,0,.35);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+}
+.mail-preview::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 6px;
+}
+.mail-preview.urgent::before { background: #ef4444; }
+.mail-preview.followup::before { background: #3b82f6; }
+.mail-preview.fyi::before { background: #22c55e; }
+.mail-preview.noise::before { background: #94a3b8; }
+.mail-preview.noise { background: #f1f5f9; }
+.mail-preview.noise .mail-subject { text-decoration: line-through; color: #94a3b8; }
+.mail-preview.noise .mail-snippet { color: #94a3b8; }
+.mail-from {
+  font-size: 11px;
+  color: #6b7280;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 500;
+  gap: 8px;
+}
+.mail-from .sender { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mail-subject {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1a1a1a;
+  line-height: 1.4;
+}
+.mail-snippet {
+  font-size: 11px;
+  color: #6b7280;
+  line-height: 1.5;
+}
+.mail-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 100px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
+.mail-badge.red { background: #ef4444; }
+.mail-badge.blue { background: #3b82f6; }
+.mail-badge.green { background: #22c55e; }
+.mail-badge.gray { background: #94a3b8; }
+
 /* ── Section Commons ── */
 .section-pad {
   padding: clamp(80px, 12vw, 140px) clamp(20px, 5vw, 80px);
@@ -712,19 +839,46 @@ footer a:hover { color: var(--white); }
   <p class="section-desc fade-in">メールを開かなくても、重要な情報が自動で届く</p>
   <div class="briefing-grid">
     <div class="briefing-card fade-in fade-in-delay-1">
-      <span class="briefing-emoji"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v8"/><path d="m4.93 10.93 1.41 1.41"/><path d="M2 18h2"/><path d="M20 18h2"/><path d="m19.07 10.93-1.41 1.41"/><path d="M22 22H2"/><path d="m8 22 4-10 4 10"/><path d="M12 10a4 4 0 0 1 4 4"/><path d="M12 10a4 4 0 0 0-4 4"/></svg></span>
+      <div class="mini-chat morning">
+        <div class="mini-row">
+          <div class="mini-avatar">AI</div>
+          <div class="mini-bubble">おはようございます☀️<br>今日の要対応 <strong>3件</strong></div>
+        </div>
+        <div class="mini-row">
+          <div class="mini-avatar">AI</div>
+          <div class="mini-bubble"><span class="tag-red">●</span> 田中さん 契約書の件<br>10:00 定例MTG</div>
+        </div>
+      </div>
       <p class="briefing-time">朝 8:00</p>
       <h3 class="briefing-title">モーニングブリーフィング</h3>
       <p class="briefing-desc">今日の要対応メール＋カレンダー予定をまとめて報告</p>
     </div>
     <div class="briefing-card fade-in fade-in-delay-2">
-      <span class="briefing-emoji"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg></span>
+      <div class="mini-chat noon">
+        <div class="mini-row">
+          <div class="mini-avatar">AI</div>
+          <div class="mini-bubble">午前中の新着 <strong>2件</strong></div>
+        </div>
+        <div class="mini-row">
+          <div class="mini-avatar">AI</div>
+          <div class="mini-bubble">山田商事から見積依頼<br>週次レポート到着</div>
+        </div>
+      </div>
       <p class="briefing-time">昼 12:00</p>
       <h3 class="briefing-title">午前中の新着チェック</h3>
       <p class="briefing-desc">午前中に届いた新着メールがあれば報告</p>
     </div>
     <div class="briefing-card fade-in fade-in-delay-3">
-      <span class="briefing-emoji"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></span>
+      <div class="mini-chat evening">
+        <div class="mini-row">
+          <div class="mini-avatar">AI</div>
+          <div class="mini-bubble">おつかれさまでした🌙<br>未対応 <strong>2件</strong> 残っています</div>
+        </div>
+        <div class="mini-row">
+          <div class="mini-avatar">AI</div>
+          <div class="mini-bubble">明日は <strong>3件</strong> 予定あり<br>9:00 朝会から</div>
+        </div>
+      </div>
       <p class="briefing-time">夜 18:00</p>
       <h3 class="briefing-title">イブニングまとめ</h3>
       <p class="briefing-desc">未対応メールのまとめ＋明日の予定を報告</p>
@@ -739,22 +893,50 @@ footer a:hover { color: var(--white); }
   <p class="section-desc fade-in">重要なものだけ、あなたに届ける</p>
   <div class="classify-grid">
     <div class="classify-card fade-in fade-in-delay-1">
-      <span class="classify-emoji"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg></span>
+      <div class="mail-preview urgent">
+        <div class="mail-from">
+          <span class="sender">田中 様（ABC商事）</span>
+          <span class="mail-badge red">未返信3日</span>
+        </div>
+        <div class="mail-subject">契約書の件、ご確認お願いします</div>
+        <div class="mail-snippet">先日お送りした契約書についてご確認いただけましたでしょうか…</div>
+      </div>
       <h3 class="classify-name">要返信</h3>
       <p class="classify-desc">未返信で対応が必要なメールを優先度順に報告</p>
     </div>
     <div class="classify-card fade-in fade-in-delay-2">
-      <span class="classify-emoji"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
+      <div class="mail-preview followup">
+        <div class="mail-from">
+          <span class="sender">自分 → 山田商事</span>
+          <span class="mail-badge blue">返信待ち5日</span>
+        </div>
+        <div class="mail-subject">ご提案書の送付の件</div>
+        <div class="mail-snippet">先日ご依頼いただいた提案書を添付いたします。ご検討のほど…</div>
+      </div>
       <h3 class="classify-name">フォローアップ</h3>
       <p class="classify-desc">自分が送ったメールで返信待ちが3日以上のものを検出</p>
     </div>
     <div class="classify-card fade-in fade-in-delay-3">
-      <span class="classify-emoji"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></span>
+      <div class="mail-preview fyi">
+        <div class="mail-from">
+          <span class="sender">週次ニュースレター 他</span>
+          <span class="mail-badge green">既読OK 8件</span>
+        </div>
+        <div class="mail-subject">今週の業界トピック／社内通知</div>
+        <div class="mail-snippet">件数だけ報告。読まなくてもOKな情報共有です。</div>
+      </div>
       <h3 class="classify-name">新着FYI</h3>
       <p class="classify-desc">読むだけでOKな情報共有・通知は件数だけ報告</p>
     </div>
     <div class="classify-card fade-in fade-in-delay-4">
-      <span class="classify-emoji"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="m9 12 2 2 4-4"/></svg></span>
+      <div class="mail-preview noise">
+        <div class="mail-from">
+          <span class="sender">no-reply@marketing.example</span>
+          <span class="mail-badge gray">スキップ 12件</span>
+        </div>
+        <div class="mail-subject">【広告】今だけ◯◯％OFFキャンペーン</div>
+        <div class="mail-snippet">自動通知・広告メールは通知しません。</div>
+      </div>
       <h3 class="classify-name">ノイズ除外</h3>
       <p class="classify-desc">マーケティングや自動通知は自動でスキップ</p>
     </div>

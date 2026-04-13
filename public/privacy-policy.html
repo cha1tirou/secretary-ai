@@ -47,7 +47,7 @@ footer a:hover{color:var(--white)}
 <!-- ===================== 日本語版 ===================== -->
 <section id="ja">
   <h1>プライバシーポリシー</h1>
-  <p class="updated">最終更新日: 2026年4月12日</p>
+  <p class="updated">最終更新日: 2026年4月13日</p>
   <div class="lang-switch">
     <a href="#ja">日本語</a>
     <a href="#en">English</a>
@@ -113,12 +113,22 @@ footer a:hover{color:var(--white)}
     <li>特定データの開示・削除を個別に希望される場合は、下記問い合わせ先までご連絡ください。原則1週間以内に対応します。</li>
   </ul>
 
-  <h2>7. データ保管期間</h2>
-  <ul>
-    <li>OAuthトークン: ユーザーが退会またはGoogle側で権限取消するまで</li>
-    <li>会話履歴: 最新10件のみDBに保持（以降は自動削除）</li>
-    <li>メール本文・カレンダー内容: 恒久的には保存せず、処理の都度Google APIから取得</li>
-  </ul>
+  <h2>7. データ保管期間と保存項目（Limited Use 対応）</h2>
+  <p>本サービスでは、Googleユーザーデータの<strong>原本（メール本文・カレンダー予定の生データ）はサーバーに恒久保存しません</strong>。AI処理に必要なタイミングでGoogle APIから都度取得し、処理後は破棄します。ただし、機能提供のため以下の<strong>派生データのみ</strong>を最小限保存します。</p>
+  <table style="width:100%;border-collapse:collapse;margin-top:12px">
+    <thead>
+      <tr style="border-bottom:1px solid var(--border)"><th align="left" style="padding:8px 6px;color:var(--white);font-size:14px">保存項目</th><th align="left" style="padding:8px 6px;color:var(--white);font-size:14px">内容</th><th align="left" style="padding:8px 6px;color:var(--white);font-size:14px">保管期間</th></tr>
+    </thead>
+    <tbody style="font-size:14px">
+      <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 6px">OAuthトークン</td><td style="padding:8px 6px">Google認証トークン（暗号化保存）</td><td style="padding:8px 6px">退会または権限取消まで</td></tr>
+      <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 6px">会話履歴</td><td style="padding:8px 6px">LINE上のユーザー入力とAI応答</td><td style="padding:8px 6px">最新10件のみ保持</td></tr>
+      <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 6px">朝のブリーフィング要約</td><td style="padding:8px 6px">重要メールのAI生成要約（本文ではない）</td><td style="padding:8px 6px">表示用に短期保持</td></tr>
+      <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 6px">返信ドラフト</td><td style="padding:8px 6px">送信前の返信文案（ユーザー承認待ち）</td><td style="padding:8px 6px">送信完了またはキャンセルで削除</td></tr>
+      <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 6px">処理済みメールID</td><td style="padding:8px 6px">message_id と分類カテゴリのみ（本文なし）</td><td style="padding:8px 6px">重複通知防止のため保持</td></tr>
+      <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 6px">メール監視ルール</td><td style="padding:8px 6px">ユーザーが設定した送信者・キーワード</td><td style="padding:8px 6px">ユーザーが削除するまで</td></tr>
+    </tbody>
+  </table>
+  <p style="margin-top:12px">上記の派生データは、いずれも<strong>ユーザーへの機能提供（要約表示・重複通知防止・返信フロー）に必要不可欠</strong>な範囲に限定されており、Google API Services User Data Policy の Limited Use 要件における例外（"Allow users to view their data" 等）に該当します。</p>
 
   <h2>8. Google API Services User Data Policy への準拠</h2>
   <p>本サービスによるGoogleユーザーデータの取得および利用は、
@@ -139,7 +149,7 @@ footer a:hover{color:var(--white)}
 <!-- ===================== English ===================== -->
 <section id="en">
   <h1 style="margin-top:48px">Privacy Policy</h1>
-  <p class="updated">Last updated: April 12, 2026</p>
+  <p class="updated">Last updated: April 13, 2026</p>
 
   <h2>1. Operator</h2>
   <p>AI秘書 ("the Service") is a LINE-based AI assistant operated personally by Soichiro Uno ("the Operator").</p>
@@ -203,12 +213,22 @@ footer a:hover{color:var(--white)}
     <li>For individual disclosure or deletion requests, please contact us below. We respond within one week.</li>
   </ul>
 
-  <h2>7. Retention</h2>
-  <ul>
-    <li>OAuth tokens: until the user unsubscribes or revokes access on Google's side</li>
-    <li>Conversation history: only the latest 10 messages are kept in the DB (older entries are deleted automatically)</li>
-    <li>Email bodies and calendar contents: not stored permanently; fetched from Google APIs each time processing is needed</li>
-  </ul>
+  <h2>7. Retention and Stored Items (Limited Use Compliance)</h2>
+  <p>The Service does <strong>not permanently store the original Google user data</strong> (raw email bodies, raw calendar event data) on its servers. Such data is fetched from Google APIs only when needed for AI processing and discarded afterwards. To provide the features, only the following <strong>derived data</strong> is stored, kept to a minimum.</p>
+  <table style="width:100%;border-collapse:collapse;margin-top:12px">
+    <thead>
+      <tr style="border-bottom:1px solid var(--border)"><th align="left" style="padding:8px 6px;color:var(--white);font-size:14px">Item</th><th align="left" style="padding:8px 6px;color:var(--white);font-size:14px">Content</th><th align="left" style="padding:8px 6px;color:var(--white);font-size:14px">Retention</th></tr>
+    </thead>
+    <tbody style="font-size:14px">
+      <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 6px">OAuth tokens</td><td style="padding:8px 6px">Google auth tokens (encrypted)</td><td style="padding:8px 6px">Until the user unsubscribes or revokes</td></tr>
+      <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 6px">Conversation history</td><td style="padding:8px 6px">User messages and AI replies on LINE</td><td style="padding:8px 6px">Only the latest 10 entries</td></tr>
+      <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 6px">Morning briefing summaries</td><td style="padding:8px 6px">AI-generated summaries of important emails (not the raw body)</td><td style="padding:8px 6px">Short-term, for display</td></tr>
+      <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 6px">Reply drafts</td><td style="padding:8px 6px">Pending reply drafts awaiting user approval</td><td style="padding:8px 6px">Deleted on send or cancellation</td></tr>
+      <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 6px">Processed email IDs</td><td style="padding:8px 6px">message_id and category only (no body)</td><td style="padding:8px 6px">Kept to prevent duplicate notifications</td></tr>
+      <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 6px">Email watch rules</td><td style="padding:8px 6px">User-defined senders / keywords to watch</td><td style="padding:8px 6px">Until the user deletes them</td></tr>
+    </tbody>
+  </table>
+  <p style="margin-top:12px">All of the above derived data is strictly limited to what is <strong>indispensable for providing the user-facing features</strong> (summary display, deduplication of notifications, reply approval flow), and falls within the permitted exceptions of the Google API Services User Data Policy Limited Use requirements (e.g., "Allow users to view their data").</p>
 
   <h2>8. Compliance with Google API Services User Data Policy</h2>
   <p>The Service's use of Google user data, including transfer to other applications, complies with

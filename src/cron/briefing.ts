@@ -1,6 +1,6 @@
 import cron from "node-cron";
 import { messagingApi } from "@line/bot-sdk";
-import { getAllUsers, clearBriefingItems, saveBriefingItems } from "../db/queries.js";
+import { getAllUsers, getUsersByBriefingHour, clearBriefingItems, saveBriefingItems } from "../db/queries.js";
 import { runAgentRaw } from "../agent/index.js";
 import type { BriefingItem } from "../types.js";
 
@@ -81,11 +81,14 @@ function parseBriefingResponse(raw: string): BriefingResponse {
   }
 }
 
-async function sendBriefing(timeOfDay: TimeOfDay) {
+async function sendBriefing(timeOfDay: TimeOfDay, hour?: number) {
   const client = getClient();
-  const users = getAllUsers();
+  // 朝は briefing_hour で絞り込み、昼・夜は全員
+  const users = timeOfDay === "morning" && hour !== undefined
+    ? getUsersByBriefingHour(hour)
+    : getAllUsers();
 
-  console.log(`[briefing] ${timeOfDay} start — ${users.length} users`);
+  console.log(`[briefing] ${timeOfDay}${hour !== undefined ? `(${hour}時)` : ""} start — ${users.length} users`);
 
   for (const user of users) {
     try {
@@ -128,12 +131,14 @@ async function sendBriefing(timeOfDay: TimeOfDay) {
 }
 
 export function startBriefing() {
-  // 朝8時（JST）
-  cron.schedule("0 8 * * *", () => sendBriefing("morning"), { timezone: "Asia/Tokyo" });
+  // 朝（JST） — ユーザーごとの briefing_hour 設定に応じて 7/8/9 時に配信
+  cron.schedule("0 7 * * *", () => sendBriefing("morning", 7), { timezone: "Asia/Tokyo" });
+  cron.schedule("0 8 * * *", () => sendBriefing("morning", 8), { timezone: "Asia/Tokyo" });
+  cron.schedule("0 9 * * *", () => sendBriefing("morning", 9), { timezone: "Asia/Tokyo" });
   // 昼12時（JST）
   cron.schedule("0 12 * * *", () => sendBriefing("noon"), { timezone: "Asia/Tokyo" });
   // 夜18時（JST）
   cron.schedule("0 18 * * *", () => sendBriefing("evening"), { timezone: "Asia/Tokyo" });
 
-  console.log("[briefing] スケジュール登録完了 8:00/12:00/18:00");
+  console.log("[briefing] スケジュール登録完了 朝7/8/9・昼12・夜18");
 }

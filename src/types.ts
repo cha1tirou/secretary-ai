@@ -34,6 +34,8 @@ export type User = {
   gcalToken: string | null;
   writingStyle: string | null;
   briefingHour: number;
+  setupStage: string | null;
+  useCases: string | null;
   createdAt: string;
   updatedAt: string;
 };

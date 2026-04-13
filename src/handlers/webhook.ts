@@ -14,6 +14,7 @@ import {
   updatePendingReplyStatus,
 } from "../db/queries.js";
 import { runAgent, type Attachment } from "../agent/index.js";
+import { handleSetupMessage } from "./setup.js";
 
 const webhook = new Hono();
 
@@ -64,6 +65,14 @@ async function handleMessage(
 ) {
   const userId = messageEvent.source.userId;
   if (!userId) return;
+
+  // セットアップ中 または 「設定」キーワード を最優先で処理
+  try {
+    const handled = await handleSetupMessage(client, userId, text, messageEvent.replyToken);
+    if (handled) return;
+  } catch (err) {
+    console.error("[webhook] setup handler error:", err);
+  }
 
   // pending_reply の操作（「送信」「保留」「キャンセル」）
   const pendingMatch = text.match(/^(送信|保留|キャンセル)\s*#?(\d+)$/);

@@ -72,6 +72,15 @@ export function initDb(): void {
     d.exec("ALTER TABLE email_watch_rules ADD COLUMN pattern2 TEXT");
   }
 
+  // マイグレーション: users に setup_stage / use_cases カラム追加
+  const userCols2 = d.prepare("PRAGMA table_info(users)").all() as { name: string }[];
+  if (!userCols2.some((c) => c.name === "setup_stage")) {
+    d.exec("ALTER TABLE users ADD COLUMN setup_stage TEXT");
+  }
+  if (!userCols2.some((c) => c.name === "use_cases")) {
+    d.exec("ALTER TABLE users ADD COLUMN use_cases TEXT");
+  }
+
   // 起動時にemail_cacheの古いエントリを削除（7日以上前）
   d.exec(`DELETE FROM email_cache WHERE cached_at < datetime('now', '-7 days', 'localtime')`);
 }
@@ -123,12 +132,58 @@ export function getUser(userId: string): User | undefined {
         gmail_token AS gmailToken,
         gcal_token AS gcalToken,
         writing_style AS writingStyle,
-        briefing_hour AS briefingHour,
+        COALESCE(briefing_hour, 8) AS briefingHour,
+        setup_stage AS setupStage,
+        use_cases AS useCases,
         created_at AS createdAt,
         updated_at AS updatedAt
       FROM users WHERE user_id = ?`,
     )
     .get(userId) as User | undefined;
+}
+
+export function updateDisplayName(userId: string, displayName: string): void {
+  getDb()
+    .prepare("UPDATE users SET display_name = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?")
+    .run(displayName, userId);
+}
+
+export function updateBriefingHour(userId: string, hour: number): void {
+  getDb()
+    .prepare("UPDATE users SET briefing_hour = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?")
+    .run(hour, userId);
+}
+
+export function updateSetupStage(userId: string, stage: string | null): void {
+  getDb()
+    .prepare("UPDATE users SET setup_stage = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?")
+    .run(stage, userId);
+}
+
+export function updateUseCases(userId: string, useCases: string): void {
+  getDb()
+    .prepare("UPDATE users SET use_cases = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?")
+    .run(useCases, userId);
+}
+
+export function getSetupStage(userId: string): string | null {
+  const row = getDb()
+    .prepare("SELECT setup_stage AS stage FROM users WHERE user_id = ?")
+    .get(userId) as { stage: string | null } | undefined;
+  return row?.stage ?? null;
+}
+
+/** 朝8時のブリーフィング対象ユーザー（briefing_hour = hour） */
+export function getUsersByBriefingHour(hour: number): { lineUserId: string; displayName: string | null }[] {
+  return getDb()
+    .prepare(
+      `SELECT DISTINCT u.user_id AS lineUserId, u.display_name AS displayName
+       FROM users u
+       INNER JOIN google_accounts g ON u.user_id = g.user_id
+       WHERE g.gmail_token IS NOT NULL
+         AND COALESCE(u.briefing_hour, 8) = ?`,
+    )
+    .all(hour) as { lineUserId: string; displayName: string | null }[];
 }
 
 export function updateUserTokens(

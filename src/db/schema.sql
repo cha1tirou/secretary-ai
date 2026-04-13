@@ -22,7 +22,9 @@ CREATE TABLE IF NOT EXISTS users (
   gmail_token      TEXT,                         -- [PG] JSONB推奨
   gcal_token       TEXT,                         -- [PG] JSONB推奨
   writing_style    TEXT,
-  briefing_hour    INTEGER DEFAULT 8,
+  briefing_hour    INTEGER DEFAULT 8,          -- 0 = 通知しない / 7,8,9 = その時刻に通知
+  setup_stage      TEXT,                        -- NULL=未開始/完了, 'name','briefing','usecases' のいずれか
+  use_cases        TEXT,                        -- セットアップで選んだ主用途
   created_at       DATETIME DEFAULT CURRENT_TIMESTAMP, -- [PG] TIMESTAMPTZ DEFAULT NOW()
   updated_at       DATETIME DEFAULT CURRENT_TIMESTAMP  -- [PG] TIMESTAMPTZ DEFAULT NOW()
 );

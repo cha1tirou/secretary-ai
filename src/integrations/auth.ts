@@ -48,12 +48,13 @@ auth.get("/auth/start", (c) => {
 
   const oauth2Client = createOAuth2Client();
   const state = JSON.stringify({ userId, label });
-  const googleAuthUrl = oauth2Client.generateAuthUrl({
-    access_type: "offline",
-    scope: SCOPES,
-    prompt: "consent",
-    state,
-  });
+  const googleAuthUrl =
+    oauth2Client.generateAuthUrl({
+      access_type: "offline",
+      scope: SCOPES,
+      prompt: "consent",
+      state,
+    }) + "&hl=en";
 
   const escapedUrl = googleAuthUrl.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
   const jsUrl = googleAuthUrl.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
@@ -235,22 +236,16 @@ auth.get("/auth/callback", async (c) => {
     const { updateUserTokens } = await import("../db/queries.js");
     updateUserTokens(userId, { gmailToken: tokenJson, gcalToken: tokenJson });
 
-    // LINE に認証完了通知を送る
+    // LINE にセットアップ開始メッセージを送る
     try {
       const { messagingApi } = await import("@line/bot-sdk");
       const lineClient = new messagingApi.MessagingApiClient({
         channelAccessToken: process.env["LINE_CHANNEL_ACCESS_TOKEN"] ?? "",
       });
-      const accountInfo = email ? `\uFF08${email}\uFF09` : "";
-      await lineClient.pushMessage({
-        to: userId,
-        messages: [{
-          type: "text",
-          text: `\u2705 Google\u30A2\u30AB\u30A6\u30F3\u30C8\u306E\u9023\u643A\u304C\u5B8C\u4E86\u3057\u307E\u3057\u305F${accountInfo}\n\n\u3053\u308C\u3067\u6E96\u5099\u5B8C\u4E86\u3067\u3059\uFF01\u8A66\u3057\u306B\u8A71\u3057\u304B\u3051\u3066\u307F\u3066\u304F\u3060\u3055\u3044\u3002\n\u4F8B\uFF1A\u300C\u4ECA\u65E5\u306E\u4E88\u5B9A\u306F\uFF1F\u300D\u300C\u672A\u8AAD\u30E1\u30FC\u30EB\u3042\u308B\uFF1F\u300D`,
-        }],
-      });
+      const { startSetup } = await import("../handlers/setup.js");
+      await startSetup(lineClient, userId, email);
     } catch (lineErr) {
-      console.warn("[auth] LINE\u901A\u77E5\u5931\u6557\uFF08\u7D9A\u884C\uFF09:", lineErr);
+      console.warn("[auth] LINE通知失敗（続行）:", lineErr);
     }
 
     return c.html(`

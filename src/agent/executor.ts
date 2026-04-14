@@ -1,4 +1,4 @@
-import { getUnreadEmails, getAllEmails, sendReply, getAttachment, getMessageWithAttachments } from "../integrations/gmail.js";
+import { getUnreadEmails, sendReply, getAttachment, getMessageWithAttachments } from "../integrations/gmail.js";
 import { getWeekEvents, createEvent } from "../integrations/gcal.js";
 import { getDb, createTimer, createEmailWatchRule, getActiveEmailWatchRules, deleteEmailWatchRule } from "../db/queries.js";
 import { canSend, recordSent, buildLimitReachedMessage, buildLowRemainingNote } from "../policies/sendLimit.js";

@@ -15,6 +15,7 @@ import {
   ensureStripeCustomer,
   createCheckoutSession,
   createPortalSession,
+  listRecentInvoices,
 } from "../integrations/stripe.js";
 
 type Client = messagingApi.MessagingApiClient;
@@ -235,6 +236,61 @@ async function handlePromo(
   });
 }
 
+/** 「領収書」→ 直近の請求書PDFリスト */
+async function handleReceipts(client: Client, userId: string, replyToken: string): Promise<void> {
+  if (!isStripeEnabled()) {
+    await client.replyMessage({
+      replyToken,
+      messages: [{ type: "text", text: "決済機能は準備中です。" }],
+    });
+    return;
+  }
+  const user = getUser(userId) as unknown as { stripeCustomerId?: string };
+  if (!user?.stripeCustomerId) {
+    await client.replyMessage({
+      replyToken,
+      messages: [{
+        type: "text",
+        text: "ご契約が確認できません。プラン契約後に領収書が発行されます。",
+      }],
+    });
+    return;
+  }
+  try {
+    const invoices = await listRecentInvoices(user.stripeCustomerId, 5);
+    if (invoices.length === 0) {
+      await client.replyMessage({
+        replyToken,
+        messages: [{ type: "text", text: "まだ発行された領収書がありません。" }],
+      });
+      return;
+    }
+    const lines = ["📄 直近の領収書", ""];
+    for (const inv of invoices) {
+      const date = new Date(inv.createdAt).toLocaleDateString("ja-JP", {
+        year: "numeric", month: "2-digit", day: "2-digit",
+      });
+      const price = `¥${inv.amount.toLocaleString()}`;
+      const status = inv.status === "paid" ? "支払済" : inv.status ?? "";
+      const url = inv.pdfUrl ?? inv.hostedUrl ?? "";
+      lines.push(`・${date} ${price} ${status}`);
+      if (url) lines.push(`  ${url}`);
+    }
+    lines.push("", "※PDFリンクから領収書をダウンロードできます");
+    await client.replyMessage({
+      replyToken,
+      messages: [{ type: "text", text: lines.join("\n") }],
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[commands] receipts error:", err);
+    await client.replyMessage({
+      replyToken,
+      messages: [{ type: "text", text: `領収書の取得に失敗しました。\n${msg}` }],
+    });
+  }
+}
+
 /** 「使用量」→ 今月の送信数 */
 async function handleUsage(client: Client, userId: string, replyToken: string): Promise<void> {
   const user = getUser(userId);
@@ -316,6 +372,11 @@ export async function handleCommand(
 
   if (trimmed === "使用量") {
     await handleUsage(client, userId, replyToken);
+    return true;
+  }
+
+  if (trimmed === "領収書" || trimmed === "請求書") {
+    await handleReceipts(client, userId, replyToken);
     return true;
   }
 

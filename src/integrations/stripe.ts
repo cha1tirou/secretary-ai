@@ -71,6 +71,31 @@ export async function createCheckoutSession(params: {
   return session.url;
 }
 
+export type InvoiceSummary = {
+  number: string | null;
+  createdAt: string;
+  amount: number;
+  currency: string;
+  status: string | null;
+  pdfUrl: string | null;
+  hostedUrl: string | null;
+};
+
+export async function listRecentInvoices(customerId: string, limit = 5): Promise<InvoiceSummary[]> {
+  const stripe = getStripe();
+  if (!stripe) throw new Error("Stripeが未設定です");
+  const res = await stripe.invoices.list({ customer: customerId, limit });
+  return res.data.map((inv) => ({
+    number: inv.number ?? null,
+    createdAt: new Date((inv.created ?? 0) * 1000).toISOString(),
+    amount: inv.amount_paid ?? inv.total ?? 0,
+    currency: (inv.currency ?? "jpy").toUpperCase(),
+    status: inv.status ?? null,
+    pdfUrl: inv.invoice_pdf ?? null,
+    hostedUrl: inv.hosted_invoice_url ?? null,
+  }));
+}
+
 export async function createPortalSession(customerId: string): Promise<string> {
   const stripe = getStripe();
   if (!stripe) throw new Error("Stripeが未設定です");

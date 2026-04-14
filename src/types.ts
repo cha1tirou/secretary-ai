@@ -22,7 +22,7 @@ export type CalendarEvent = {
   location: string;
 };
 
-export type Plan = "trial" | "light" | "pro" | "expired";
+export type Plan = "trial" | "free" | "lite" | "standard" | "pro" | "expired";
 
 export type User = {
   userId: string;

@@ -72,13 +72,61 @@ export function initDb(): void {
     d.exec("ALTER TABLE email_watch_rules ADD COLUMN pattern2 TEXT");
   }
 
-  // マイグレーション: users に setup_stage / use_cases カラム追加
+  // マイグレーション: users に setup_stage / use_cases / stripe / trial 関連カラム追加
   const userCols2 = d.prepare("PRAGMA table_info(users)").all() as { name: string }[];
-  if (!userCols2.some((c) => c.name === "setup_stage")) {
-    d.exec("ALTER TABLE users ADD COLUMN setup_stage TEXT");
-  }
-  if (!userCols2.some((c) => c.name === "use_cases")) {
-    d.exec("ALTER TABLE users ADD COLUMN use_cases TEXT");
+  const addColumnIfMissing = (col: string, ddl: string) => {
+    if (!userCols2.some((c) => c.name === col)) d.exec(`ALTER TABLE users ADD COLUMN ${ddl}`);
+  };
+  addColumnIfMissing("setup_stage", "setup_stage TEXT");
+  addColumnIfMissing("use_cases", "use_cases TEXT");
+  addColumnIfMissing("stripe_customer_id", "stripe_customer_id TEXT");
+  addColumnIfMissing("stripe_subscription_id", "stripe_subscription_id TEXT");
+  addColumnIfMissing("trial_reminders_sent", "trial_reminders_sent TEXT");
+
+  // マイグレーション: 古い plan CHECK 制約 (trial,light,pro,expired) を撤廃
+  // 新プラン名 (lite,standard) を保存できるよう、CHECK制約のないテーブルに再構築
+  const usersSchema = d.prepare(
+    "SELECT sql FROM sqlite_master WHERE type='table' AND name='users'",
+  ).get() as { sql: string } | undefined;
+  if (usersSchema?.sql && usersSchema.sql.includes("CHECK(plan IN")) {
+    console.log("[migration] users テーブルの plan CHECK 制約を撤廃します");
+    d.exec(`
+      CREATE TABLE users_new (
+        user_id                TEXT PRIMARY KEY,
+        display_name           TEXT,
+        plan                   TEXT DEFAULT 'trial',
+        trial_start_date       TEXT,
+        plan_expires_at        TEXT,
+        gmail_token            TEXT,
+        gcal_token             TEXT,
+        writing_style          TEXT,
+        briefing_hour          INTEGER DEFAULT 8,
+        setup_stage            TEXT,
+        use_cases              TEXT,
+        stripe_customer_id     TEXT,
+        stripe_subscription_id TEXT,
+        trial_reminders_sent   TEXT,
+        created_at             DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at             DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+      INSERT INTO users_new (
+        user_id, display_name, plan, trial_start_date, plan_expires_at,
+        gmail_token, gcal_token, writing_style, briefing_hour,
+        setup_stage, use_cases, stripe_customer_id, stripe_subscription_id,
+        trial_reminders_sent, created_at, updated_at
+      )
+      SELECT
+        user_id, display_name,
+        CASE WHEN plan = 'light' THEN 'lite' ELSE plan END,
+        trial_start_date, plan_expires_at,
+        gmail_token, gcal_token, writing_style, COALESCE(briefing_hour, 8),
+        setup_stage, use_cases, stripe_customer_id, stripe_subscription_id,
+        trial_reminders_sent, created_at, updated_at
+      FROM users;
+      DROP TABLE users;
+      ALTER TABLE users_new RENAME TO users;
+    `);
+    console.log("[migration] users テーブル再構築完了");
   }
 
   // 起動時にemail_cacheの古いエントリを削除（7日以上前）
@@ -171,6 +219,248 @@ export function getSetupStage(userId: string): string | null {
     .prepare("SELECT setup_stage AS stage FROM users WHERE user_id = ?")
     .get(userId) as { stage: string | null } | undefined;
   return row?.stage ?? null;
+}
+
+export function updateUserPlanAndExpiry(
+  userId: string,
+  plan: string,
+  planExpiresAt: string | null,
+): void {
+  getDb()
+    .prepare(
+      "UPDATE users SET plan = ?, plan_expires_at = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?",
+    )
+    .run(plan, planExpiresAt, userId);
+}
+
+export function updateStripeIds(
+  userId: string,
+  stripeCustomerId: string | null,
+  stripeSubscriptionId: string | null,
+): void {
+  getDb()
+    .prepare(
+      `UPDATE users SET
+        stripe_customer_id = COALESCE(?, stripe_customer_id),
+        stripe_subscription_id = ?,
+        updated_at = CURRENT_TIMESTAMP
+       WHERE user_id = ?`,
+    )
+    .run(stripeCustomerId, stripeSubscriptionId, userId);
+}
+
+export function getUserByStripeCustomerId(customerId: string): User | undefined {
+  return getDb()
+    .prepare(
+      `SELECT
+        user_id AS userId,
+        display_name AS displayName,
+        COALESCE(plan, 'trial') AS plan,
+        trial_start_date AS trialStartDate,
+        plan_expires_at AS planExpiresAt,
+        gmail_token AS gmailToken,
+        gcal_token AS gcalToken,
+        writing_style AS writingStyle,
+        COALESCE(briefing_hour, 8) AS briefingHour,
+        setup_stage AS setupStage,
+        use_cases AS useCases,
+        created_at AS createdAt,
+        updated_at AS updatedAt
+       FROM users WHERE stripe_customer_id = ?`,
+    )
+    .get(customerId) as User | undefined;
+}
+
+export function addTrialReminderSent(userId: string, marker: string): void {
+  const row = getDb()
+    .prepare("SELECT trial_reminders_sent AS v FROM users WHERE user_id = ?")
+    .get(userId) as { v: string | null } | undefined;
+  const current = (row?.v ?? "").split(",").filter(Boolean);
+  if (current.includes(marker)) return;
+  current.push(marker);
+  getDb()
+    .prepare("UPDATE users SET trial_reminders_sent = ? WHERE user_id = ?")
+    .run(current.join(","), userId);
+}
+
+export function getTrialReminderSent(userId: string): string[] {
+  const row = getDb()
+    .prepare("SELECT trial_reminders_sent AS v FROM users WHERE user_id = ?")
+    .get(userId) as { v: string | null } | undefined;
+  return (row?.v ?? "").split(",").filter(Boolean);
+}
+
+/** Google連携済みユーザーのうち、trial 中のユーザー */
+export function getAllTrialUsers(): Array<{
+  lineUserId: string;
+  displayName: string | null;
+  trialStartDate: string | null;
+  remindersSent: string;
+}> {
+  return getDb()
+    .prepare(
+      `SELECT DISTINCT
+        u.user_id AS lineUserId,
+        u.display_name AS displayName,
+        u.trial_start_date AS trialStartDate,
+        COALESCE(u.trial_reminders_sent, '') AS remindersSent
+       FROM users u
+       INNER JOIN google_accounts g ON u.user_id = g.user_id
+       WHERE g.gmail_token IS NOT NULL
+         AND u.plan = 'trial'
+         AND u.trial_start_date IS NOT NULL`,
+    )
+    .all() as Array<{ lineUserId: string; displayName: string | null; trialStartDate: string | null; remindersSent: string }>;
+}
+
+// ── Promo Codes ──
+
+export type PromoCode = {
+  id: number;
+  code: string;
+  plan: string;
+  durationMonths: number;
+  maxUses: number | null;
+  usedCount: number;
+  expiresAt: string | null;
+  active: number;
+  note: string | null;
+  createdAt: string;
+};
+
+export function createPromoCode(params: {
+  code: string;
+  plan: string;
+  durationMonths: number;
+  maxUses: number | null;
+  expiresAt: string | null;
+  note: string | null;
+}): number {
+  const result = getDb()
+    .prepare(
+      `INSERT INTO promo_codes (code, plan, duration_months, max_uses, expires_at, note)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    )
+    .run(
+      params.code,
+      params.plan,
+      params.durationMonths,
+      params.maxUses,
+      params.expiresAt,
+      params.note,
+    );
+  return Number(result.lastInsertRowid);
+}
+
+export function getPromoCodeByCode(code: string): PromoCode | undefined {
+  return getDb()
+    .prepare(
+      `SELECT id, code, plan, duration_months AS durationMonths, max_uses AS maxUses,
+        used_count AS usedCount, expires_at AS expiresAt, active, note, created_at AS createdAt
+       FROM promo_codes WHERE code = ?`,
+    )
+    .get(code) as PromoCode | undefined;
+}
+
+export function listPromoCodes(): PromoCode[] {
+  return getDb()
+    .prepare(
+      `SELECT id, code, plan, duration_months AS durationMonths, max_uses AS maxUses,
+        used_count AS usedCount, expires_at AS expiresAt, active, note, created_at AS createdAt
+       FROM promo_codes ORDER BY created_at DESC`,
+    )
+    .all() as PromoCode[];
+}
+
+export function setPromoCodeActive(id: number, active: boolean): void {
+  getDb()
+    .prepare("UPDATE promo_codes SET active = ? WHERE id = ?")
+    .run(active ? 1 : 0, id);
+}
+
+/** プロモコード利用処理（トランザクション：usedCount++ & user_promos insert） */
+export function redeemPromoCode(params: {
+  userId: string;
+  codeId: number;
+  plan: string;
+  expiresAt: string;
+}): void {
+  const d = getDb();
+  const tx = d.transaction(() => {
+    d.prepare("UPDATE promo_codes SET used_count = used_count + 1 WHERE id = ?").run(params.codeId);
+    d.prepare(
+      `INSERT INTO user_promos (user_id, code_id, plan, expires_at) VALUES (?, ?, ?, ?)`,
+    ).run(params.userId, params.codeId, params.plan, params.expiresAt);
+  });
+  tx();
+}
+
+export type UserPromo = {
+  id: number;
+  userId: string;
+  codeId: number;
+  plan: string;
+  redeemedAt: string;
+  expiresAt: string;
+  expiryNotified: number;
+  expiredNotified: number;
+};
+
+export function getActiveUserPromos(): UserPromo[] {
+  return getDb()
+    .prepare(
+      `SELECT id, user_id AS userId, code_id AS codeId, plan,
+        redeemed_at AS redeemedAt, expires_at AS expiresAt,
+        expiry_notified AS expiryNotified, expired_notified AS expiredNotified
+       FROM user_promos
+       WHERE datetime(expires_at) >= datetime('now', '-7 days')`,
+    )
+    .all() as UserPromo[];
+}
+
+export function markUserPromoExpiryNotified(id: number): void {
+  getDb().prepare("UPDATE user_promos SET expiry_notified = 1 WHERE id = ?").run(id);
+}
+
+export function markUserPromoExpiredNotified(id: number): void {
+  getDb().prepare("UPDATE user_promos SET expired_notified = 1 WHERE id = ?").run(id);
+}
+
+/** 管理画面: 全ユーザー一覧 */
+export function listAllUsersWithStatus(): Array<{
+  userId: string;
+  displayName: string | null;
+  plan: string;
+  planExpiresAt: string | null;
+  trialStartDate: string | null;
+  email: string | null;
+  stripeCustomerId: string | null;
+  createdAt: string;
+}> {
+  return getDb()
+    .prepare(
+      `SELECT
+        u.user_id AS userId,
+        u.display_name AS displayName,
+        u.plan AS plan,
+        u.plan_expires_at AS planExpiresAt,
+        u.trial_start_date AS trialStartDate,
+        (SELECT g.email FROM google_accounts g WHERE g.user_id = u.user_id ORDER BY g.created_at ASC LIMIT 1) AS email,
+        u.stripe_customer_id AS stripeCustomerId,
+        u.created_at AS createdAt
+       FROM users u
+       ORDER BY u.created_at DESC`,
+    )
+    .all() as Array<{
+      userId: string;
+      displayName: string | null;
+      plan: string;
+      planExpiresAt: string | null;
+      trialStartDate: string | null;
+      email: string | null;
+      stripeCustomerId: string | null;
+      createdAt: string;
+    }>;
 }
 
 /** 朝8時のブリーフィング対象ユーザー（briefing_hour = hour） */
@@ -405,12 +695,23 @@ export function getPendingReply(id: number): PendingReply | undefined {
 // ── Monthly Send Count ──
 
 const SEND_LIMITS: Record<string, number> = {
-  trial: 5,
+  trial: 150,     // Pro相当（7日間お試し）
   free: 5,
   lite: 30,
   standard: 60,
   pro: 150,
+  expired: 5,     // 決済失敗時も Free 相当で継続利用可
 };
+
+export const PLAN_PRICES_JPY: Record<string, number> = {
+  lite: 480,
+  standard: 980,
+  pro: 1980,
+};
+
+export function getPlanLimit(plan: string): number {
+  return SEND_LIMITS[plan] ?? SEND_LIMITS["free"]!;
+}
 
 export function getMonthlySendCount(userId: string): number {
   const now = new Date();

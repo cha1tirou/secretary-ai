@@ -60,13 +60,20 @@ function useCasesQuickReply(): messagingApi.Message {
 }
 
 /** 完了メッセージ（パーソナライズあり） */
-function buildCompletionMessage(name: string, briefingHour: number): string {
+function buildCompletionMessage(name: string, briefingHour: number, trialStartDate: string | null): string {
   const briefingLine = briefingHour === 0
     ? "朝のブリーフィングは送りません（「設定」でいつでも変更できます）。"
     : `毎朝 ${briefingHour}:00 に今日のブリーフィングをお届けします。`;
 
+  const trialEnd = trialStartDate
+    ? new Date(new Date(trialStartDate).getTime() + 7 * 24 * 3600 * 1000)
+    : new Date(Date.now() + 7 * 24 * 3600 * 1000);
+  const trialEndLabel = trialEnd.toLocaleDateString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit" });
+
   return [
     `🎉 セットアップ完了です、${name}さん！`,
+    "",
+    `🎁 ${trialEndLabel} まで Proプランを無料でお試しいただけます（月150通まで送信OK）`,
     "",
     briefingLine,
     "",
@@ -89,6 +96,7 @@ function buildCompletionMessage(name: string, briefingHour: number): string {
     "",
     "━━━━━━━━━━━━━━",
     "設定を変えたいときは「設定」と送ってください🙌",
+    "プランの詳細は「プラン」、今月の使用量は「使用量」でチェックできます。",
   ].join("\n");
 }
 
@@ -185,9 +193,10 @@ export async function handleSetupMessage(
     const updated = getUser(userId);
     const name = updated?.displayName ?? "あなた";
     const briefingHour = updated?.briefingHour ?? 8;
+    const trialStartDate = updated?.trialStartDate ?? null;
     await client.replyMessage({
       replyToken,
-      messages: [{ type: "text", text: buildCompletionMessage(name, briefingHour) }],
+      messages: [{ type: "text", text: buildCompletionMessage(name, briefingHour, trialStartDate) }],
     });
     return true;
   }

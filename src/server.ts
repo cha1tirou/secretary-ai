@@ -10,6 +10,9 @@ import { auth } from "./integrations/auth.js";
 import { startBriefing } from "./cron/briefing.js";
 import { startTimerCron } from "./cron/timer.js";
 import { startEmailWatchCron } from "./cron/emailWatch.js";
+import { startReminderCron } from "./cron/reminders.js";
+import { stripeWebhook } from "./handlers/stripe.js";
+import { admin } from "./handlers/admin.js";
 
 const app = new Hono();
 
@@ -24,6 +27,7 @@ initDb();
 startBriefing();
 startTimerCron();
 startEmailWatchCron();
+startReminderCron();
 
 // ヘルスチェック
 app.get("/health", (c) => c.json({ status: "ok" }));
@@ -103,6 +107,17 @@ app.route("/", webhook);
 
 // Google OAuth2
 app.route("/", auth);
+
+// Stripe Webhook
+app.route("/", stripeWebhook);
+
+// 管理画面
+app.route("/", admin);
+
+// 決済完了/キャンセルの単純ページ（Stripe Checkout の成功/キャンセル URL）
+app.get("/billing/success", (c) => c.html(`<!DOCTYPE html><html lang="ja"><body style="font-family:sans-serif;text-align:center;padding:60px;"><h1>ご登録ありがとうございます🎉</h1><p>このページを閉じて、LINEに戻ってください。</p></body></html>`));
+app.get("/billing/cancel", (c) => c.html(`<!DOCTYPE html><html lang="ja"><body style="font-family:sans-serif;text-align:center;padding:60px;"><h1>決済はキャンセルされました</h1><p>LINEに戻って、もう一度「プラン」と送ってください。</p></body></html>`));
+app.get("/billing/portal-return", (c) => c.html(`<!DOCTYPE html><html lang="ja"><body style="font-family:sans-serif;text-align:center;padding:60px;"><h1>お手続き完了</h1><p>このページを閉じて、LINEに戻ってください。</p></body></html>`));
 
 const port = Number(process.env["PORT"]) || 3000;
 console.log(`Server running on http://localhost:${port}`);

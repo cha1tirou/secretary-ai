@@ -15,6 +15,7 @@ import {
 } from "../db/queries.js";
 import { runAgent, type Attachment } from "../agent/index.js";
 import { handleSetupMessage } from "./setup.js";
+import { handleCommand } from "./commands.js";
 
 const webhook = new Hono();
 
@@ -72,6 +73,14 @@ async function handleMessage(
     if (handled) return;
   } catch (err) {
     console.error("[webhook] setup handler error:", err);
+  }
+
+  // 課金系コマンド（プラン/プロモ/解約/使用量/ステータス）
+  try {
+    const handled = await handleCommand(client, userId, text, messageEvent.replyToken);
+    if (handled) return;
+  } catch (err) {
+    console.error("[webhook] command handler error:", err);
   }
 
   // pending_reply の操作（「送信」「保留」「キャンセル」）

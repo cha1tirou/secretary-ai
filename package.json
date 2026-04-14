@@ -24,7 +24,8 @@
     "hono": "^4.12.10",
     "node-cron": "^4.2.1",
     "nodemailer": "^8.0.4",
-    "pdf-parse": "^2.4.5"
+    "pdf-parse": "^2.4.5",
+    "stripe": "^22.0.1"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",

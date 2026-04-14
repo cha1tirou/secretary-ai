@@ -13,20 +13,48 @@ CREATE TABLE IF NOT EXISTS conversations (
 );
 
 CREATE TABLE IF NOT EXISTS users (
-  user_id          TEXT PRIMARY KEY,             -- [PG] VARCHAR(255) PRIMARY KEY
-  display_name     TEXT,
-  plan             TEXT DEFAULT 'trial'         -- [PG] VARCHAR(20) DEFAULT 'trial'
-                   CHECK(plan IN ('trial','light','pro','expired')),
-  trial_start_date TEXT,                        -- [PG] TIMESTAMPTZ
-  plan_expires_at  TEXT,                        -- [PG] TIMESTAMPTZ
-  gmail_token      TEXT,                         -- [PG] JSONB推奨
-  gcal_token       TEXT,                         -- [PG] JSONB推奨
-  writing_style    TEXT,
-  briefing_hour    INTEGER DEFAULT 8,          -- 0 = 通知しない / 7,8,9 = その時刻に通知
-  setup_stage      TEXT,                        -- NULL=未開始/完了, 'name','briefing','usecases' のいずれか
-  use_cases        TEXT,                        -- セットアップで選んだ主用途
-  created_at       DATETIME DEFAULT CURRENT_TIMESTAMP, -- [PG] TIMESTAMPTZ DEFAULT NOW()
-  updated_at       DATETIME DEFAULT CURRENT_TIMESTAMP  -- [PG] TIMESTAMPTZ DEFAULT NOW()
+  user_id             TEXT PRIMARY KEY,             -- [PG] VARCHAR(255) PRIMARY KEY
+  display_name        TEXT,
+  plan                TEXT DEFAULT 'trial',         -- 'trial','free','lite','standard','pro','expired' (CHECK制約はapp側で検証)
+  trial_start_date    TEXT,                         -- [PG] TIMESTAMPTZ
+  plan_expires_at     TEXT,                         -- [PG] TIMESTAMPTZ
+  gmail_token         TEXT,                          -- [PG] JSONB推奨
+  gcal_token          TEXT,                          -- [PG] JSONB推奨
+  writing_style       TEXT,
+  briefing_hour       INTEGER DEFAULT 8,             -- 0=通知しない / 7,8,9=その時刻に通知
+  setup_stage         TEXT,                          -- NULL=未開始/完了, 'name','briefing','usecases'
+  use_cases           TEXT,                          -- セットアップで選んだ主用途
+  stripe_customer_id  TEXT,
+  stripe_subscription_id TEXT,
+  trial_reminders_sent TEXT,                         -- CSV of day markers 'd4,d6,d8'
+  created_at          DATETIME DEFAULT CURRENT_TIMESTAMP, -- [PG] TIMESTAMPTZ DEFAULT NOW()
+  updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP  -- [PG] TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- プロモコード（インフルエンサー等向け）
+CREATE TABLE IF NOT EXISTS promo_codes (
+  id               INTEGER PRIMARY KEY AUTOINCREMENT,
+  code             TEXT UNIQUE NOT NULL,              -- ユーザーが入力する文字列
+  plan             TEXT NOT NULL,                     -- 'lite','standard','pro'
+  duration_months  INTEGER NOT NULL,                  -- 付与する期間（月数）
+  max_uses         INTEGER,                           -- NULL=無制限
+  used_count       INTEGER NOT NULL DEFAULT 0,
+  expires_at       TEXT,                              -- コード自体の有効期限（NULL=無期限）
+  active           INTEGER NOT NULL DEFAULT 1,
+  note             TEXT,                              -- 管理用メモ（例：〇〇さん向け）
+  created_at       TEXT DEFAULT (datetime('now','localtime'))
+);
+
+-- プロモコード利用履歴
+CREATE TABLE IF NOT EXISTS user_promos (
+  id                INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id           TEXT NOT NULL,
+  code_id           INTEGER NOT NULL,
+  plan              TEXT NOT NULL,
+  redeemed_at       TEXT DEFAULT (datetime('now','localtime')),
+  expires_at        TEXT NOT NULL,                    -- 付与プランの終了日時
+  expiry_notified   INTEGER NOT NULL DEFAULT 0,       -- 7日前通知済みフラグ
+  expired_notified  INTEGER NOT NULL DEFAULT 0        -- 終了通知済みフラグ
 );
 
 CREATE TABLE IF NOT EXISTS processed_emails (

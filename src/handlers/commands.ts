@@ -9,6 +9,8 @@ import {
   getMonthlySendCount,
   getPlanLimit,
   PLAN_PRICES_JPY,
+  logUsage,
+  countRecentUsage,
 } from "../db/queries.js";
 import {
   isStripeEnabled,
@@ -191,6 +193,21 @@ async function handlePromo(
     });
     return;
   }
+
+  // レート制限: 直近1時間で5回以上試行したら拒否（辞書攻撃対策）
+  const attemptsLastHour = countRecentUsage(userId, "promo_attempt", 60);
+  if (attemptsLastHour >= 5) {
+    await client.replyMessage({
+      replyToken,
+      messages: [{
+        type: "text",
+        text: "⏱️ プロモコードの試行回数が多すぎます。\n1時間ほど経ってから再試行してください。",
+      }],
+    });
+    return;
+  }
+  logUsage(userId, "promo_attempt");
+
   const promo = getPromoCodeByCode(trimmed);
   const now = new Date();
   let failReason: string | null = null;

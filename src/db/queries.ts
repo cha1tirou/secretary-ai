@@ -147,6 +147,20 @@ export function initDb(): void {
 
   // 起動時にemail_cacheの古いエントリを削除（7日以上前）
   d.exec(`DELETE FROM email_cache WHERE cached_at < datetime('now', '-7 days', 'localtime')`);
+
+  // 起動時に conversations の古いエントリを削除（30日以上前）
+  cleanupOldConversations();
+}
+
+/** 30日以上前の会話履歴を削除（起動時＋daily cron から呼び出し） */
+export function cleanupOldConversations(): number {
+  const result = getDb()
+    .prepare(`DELETE FROM conversations WHERE created_at < datetime('now', '-30 days')`)
+    .run();
+  if (result.changes > 0) {
+    console.log(`[retention] conversations: ${result.changes}件の古い履歴を削除`);
+  }
+  return result.changes;
 }
 
 // ── Users ──
@@ -858,6 +872,16 @@ export function getMonthlyUsage(userId: string, actionType: string): number {
 
 export function logUsage(userId: string, actionType: string): void {
   getDb().prepare("INSERT INTO usage_logs (user_id, action_type) VALUES (?, ?)").run(userId, actionType);
+}
+
+/** 指定 user × action の直近N分間の件数 */
+export function countRecentUsage(userId: string, actionType: string, minutes: number): number {
+  const row = getDb().prepare(`
+    SELECT COUNT(*) AS cnt FROM usage_logs
+    WHERE user_id = ? AND action_type = ?
+      AND created_at >= datetime('now', ?, 'localtime')
+  `).get(userId, actionType, `-${minutes} minutes`) as { cnt: number };
+  return row.cnt;
 }
 
 export const USAGE_LIMITS: Record<string, Record<string, number>> = {

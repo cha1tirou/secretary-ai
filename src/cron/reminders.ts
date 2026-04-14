@@ -8,6 +8,7 @@ import {
   markUserPromoExpiredNotified,
   updateUserPlanAndExpiry,
   getUser,
+  cleanupOldConversations,
 } from "../db/queries.js";
 
 function getClient() {
@@ -139,10 +140,15 @@ async function sendPromoReminders() {
 }
 
 export function startReminderCron() {
-  // 毎日 8:05（ブリーフィングの5分後）に通知チェック
+  // 毎日 8:05（ブリーフィングの5分後）に通知チェック＋retention
   cron.schedule("5 8 * * *", async () => {
     await sendTrialReminders();
     await sendPromoReminders();
+    try {
+      cleanupOldConversations();
+    } catch (err) {
+      console.error("[reminders] retention error:", err);
+    }
   }, { timezone: "Asia/Tokyo" });
 
   console.log("[reminders] スケジュール登録完了 8:05");

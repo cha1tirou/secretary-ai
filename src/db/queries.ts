@@ -92,7 +92,9 @@ export function initDb(): void {
     console.log("[migration] users テーブルの plan CHECK 制約を撤廃します");
     // 前回のマイグレーション失敗で残存していれば削除
     d.exec("DROP TABLE IF EXISTS users_new");
-    // SQLite は DDL を含む TRANSACTION をサポートするので、全体を1トランザクションに
+    // google_accounts → users の FK が DROP TABLE users を阻止するので、
+    // マイグレーション中だけ FK を外す（SQLite 推奨手順）
+    d.pragma("foreign_keys = OFF");
     d.exec("BEGIN");
     try {
       d.exec(`
@@ -138,6 +140,8 @@ export function initDb(): void {
     } catch (err) {
       d.exec("ROLLBACK");
       throw err;
+    } finally {
+      d.pragma("foreign_keys = ON");
     }
   }
 

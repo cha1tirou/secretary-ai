@@ -90,43 +90,55 @@ export function initDb(): void {
   ).get() as { sql: string } | undefined;
   if (usersSchema?.sql && usersSchema.sql.includes("CHECK(plan IN")) {
     console.log("[migration] users テーブルの plan CHECK 制約を撤廃します");
-    d.exec(`
-      CREATE TABLE users_new (
-        user_id                TEXT PRIMARY KEY,
-        display_name           TEXT,
-        plan                   TEXT DEFAULT 'trial',
-        trial_start_date       TEXT,
-        plan_expires_at        TEXT,
-        gmail_token            TEXT,
-        gcal_token             TEXT,
-        writing_style          TEXT,
-        briefing_hour          INTEGER DEFAULT 8,
-        setup_stage            TEXT,
-        use_cases              TEXT,
-        stripe_customer_id     TEXT,
-        stripe_subscription_id TEXT,
-        trial_reminders_sent   TEXT,
-        created_at             DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at             DATETIME DEFAULT CURRENT_TIMESTAMP
-      );
-      INSERT INTO users_new (
-        user_id, display_name, plan, trial_start_date, plan_expires_at,
-        gmail_token, gcal_token, writing_style, briefing_hour,
-        setup_stage, use_cases, stripe_customer_id, stripe_subscription_id,
-        trial_reminders_sent, created_at, updated_at
-      )
-      SELECT
-        user_id, display_name,
-        CASE WHEN plan = 'light' THEN 'lite' ELSE plan END,
-        trial_start_date, plan_expires_at,
-        gmail_token, gcal_token, writing_style, COALESCE(briefing_hour, 8),
-        setup_stage, use_cases, stripe_customer_id, stripe_subscription_id,
-        trial_reminders_sent, created_at, updated_at
-      FROM users;
-      DROP TABLE users;
-      ALTER TABLE users_new RENAME TO users;
-    `);
-    console.log("[migration] users テーブル再構築完了");
+    // 前回のマイグレーション失敗で残存していれば削除
+    d.exec("DROP TABLE IF EXISTS users_new");
+    // SQLite は DDL を含む TRANSACTION をサポートするので、全体を1トランザクションに
+    d.exec("BEGIN");
+    try {
+      d.exec(`
+        CREATE TABLE users_new (
+          user_id                TEXT PRIMARY KEY,
+          display_name           TEXT,
+          plan                   TEXT DEFAULT 'trial',
+          trial_start_date       TEXT,
+          plan_expires_at        TEXT,
+          gmail_token            TEXT,
+          gcal_token             TEXT,
+          writing_style          TEXT,
+          briefing_hour          INTEGER DEFAULT 8,
+          setup_stage            TEXT,
+          use_cases              TEXT,
+          stripe_customer_id     TEXT,
+          stripe_subscription_id TEXT,
+          trial_reminders_sent   TEXT,
+          created_at             DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at             DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+      d.exec(`
+        INSERT INTO users_new (
+          user_id, display_name, plan, trial_start_date, plan_expires_at,
+          gmail_token, gcal_token, writing_style, briefing_hour,
+          setup_stage, use_cases, stripe_customer_id, stripe_subscription_id,
+          trial_reminders_sent, created_at, updated_at
+        )
+        SELECT
+          user_id, display_name,
+          CASE WHEN plan = 'light' THEN 'lite' ELSE plan END,
+          trial_start_date, plan_expires_at,
+          gmail_token, gcal_token, writing_style, COALESCE(briefing_hour, 8),
+          setup_stage, use_cases, stripe_customer_id, stripe_subscription_id,
+          trial_reminders_sent, created_at, updated_at
+        FROM users;
+      `);
+      d.exec("DROP TABLE users");
+      d.exec("ALTER TABLE users_new RENAME TO users");
+      d.exec("COMMIT");
+      console.log("[migration] users テーブル再構築完了");
+    } catch (err) {
+      d.exec("ROLLBACK");
+      throw err;
+    }
   }
 
   // 起動時にemail_cacheの古いエントリを削除（7日以上前）

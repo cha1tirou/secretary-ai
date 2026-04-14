@@ -36,6 +36,8 @@ export type User = {
   briefingHour: number;
   setupStage: string | null;
   useCases: string | null;
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
   createdAt: string;
   updatedAt: string;
 };

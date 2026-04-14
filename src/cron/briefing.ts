@@ -1,6 +1,14 @@
 import cron from "node-cron";
 import { messagingApi } from "@line/bot-sdk";
-import { getAllUsers, getUsersByBriefingHour, clearBriefingItems, saveBriefingItems } from "../db/queries.js";
+import {
+  getAllUsers,
+  getUsersByBriefingHour,
+  clearBriefingItems,
+  saveBriefingItems,
+  getUser,
+  getMonthlySendCount,
+  getPlanLimit,
+} from "../db/queries.js";
 import { runAgentRaw } from "../agent/index.js";
 import type { BriefingItem } from "../types.js";
 
@@ -118,9 +126,25 @@ async function sendBriefing(timeOfDay: TimeOfDay, hour?: number) {
         saveBriefingItems(user.lineUserId, briefingItems);
       }
 
+      // 朝ブリーフィングのみ、Free/expired ユーザーに使用量を付加
+      let finalMessage = message;
+      if (timeOfDay === "morning") {
+        const u = getUser(user.lineUserId);
+        if (u && (u.plan === "free" || u.plan === "expired")) {
+          const used = getMonthlySendCount(user.lineUserId);
+          const limit = getPlanLimit(u.plan);
+          finalMessage += `\n\n📈 今月 ${used}/${limit}通 使用中`;
+          if (used >= limit) {
+            finalMessage += "（上限到達 — 使い続けるなら「プラン」を）";
+          } else if (used / limit >= 0.8) {
+            finalMessage += `（あと ${limit - used}通）`;
+          }
+        }
+      }
+
       await client.pushMessage({
         to: user.lineUserId,
-        messages: [{ type: "text", text: message }],
+        messages: [{ type: "text", text: finalMessage }],
       });
     } catch (err) {
       console.error(`[briefing] error for ${user.lineUserId}:`, err);

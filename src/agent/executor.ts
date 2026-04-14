@@ -1,6 +1,7 @@
 import { getUnreadEmails, getAllEmails, sendReply, getAttachment, getMessageWithAttachments } from "../integrations/gmail.js";
 import { getWeekEvents, createEvent } from "../integrations/gcal.js";
 import { getDb, createTimer, createEmailWatchRule, getActiveEmailWatchRules, deleteEmailWatchRule } from "../db/queries.js";
+import { canSend, recordSent, buildLimitReachedMessage, buildLowRemainingNote } from "../policies/sendLimit.js";
 
 function ensureMemoryTable(): void {
   getDb().exec(`
@@ -56,9 +57,15 @@ export async function executeTool(
       const to = input["to"] as string;
       const subject = input["subject"] as string;
       const body = input["body"] as string;
+      const precheck = canSend(userId);
+      if (!precheck.allowed) {
+        return buildLimitReachedMessage(precheck);
+      }
       // sendReply requires a threadId; for new emails we pass empty string
       const result = await sendReply(userId, "", to, subject, body);
-      return `メールを送信しました。(ID: ${result})`;
+      recordSent(userId);
+      const note = buildLowRemainingNote(canSend(userId));
+      return `メールを送信しました。(ID: ${result})${note}`;
     }
 
     case "calendar_get_events": {

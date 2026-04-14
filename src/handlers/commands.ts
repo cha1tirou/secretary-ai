@@ -108,18 +108,16 @@ async function handlePlanSelect(
     const user = getUser(userId);
     const accounts = getGoogleAccountsByUserId(userId);
     const email = accounts[0]?.email ?? null;
+    const existingCustomerId = user?.stripeCustomerId ?? null;
     const customerId = await ensureStripeCustomer({
       userId,
       email,
-      existingCustomerId: null, // 毎回新規は避けたいので user から取得
+      existingCustomerId,
     });
-    // 既存stripe_customer_id があればそっちを優先
-    const existingCustomerIdRaw = (user as unknown as { stripeCustomerId?: string })?.stripeCustomerId;
-    const finalCustomerId = existingCustomerIdRaw || customerId;
-    if (!existingCustomerIdRaw) {
+    if (!existingCustomerId) {
       updateStripeIds(userId, customerId, null);
     }
-    const url = await createCheckoutSession({ userId, customerId: finalCustomerId, plan: planLower });
+    const url = await createCheckoutSession({ userId, customerId, plan: planLower });
     await client.replyMessage({
       replyToken,
       messages: [
@@ -148,7 +146,7 @@ async function handleCancel(client: Client, userId: string, replyToken: string):
     });
     return;
   }
-  const user = getUser(userId) as unknown as { stripeCustomerId?: string };
+  const user = getUser(userId);
   if (!user?.stripeCustomerId) {
     await client.replyMessage({
       replyToken,
@@ -245,7 +243,7 @@ async function handleReceipts(client: Client, userId: string, replyToken: string
     });
     return;
   }
-  const user = getUser(userId) as unknown as { stripeCustomerId?: string };
+  const user = getUser(userId);
   if (!user?.stripeCustomerId) {
     await client.replyMessage({
       replyToken,

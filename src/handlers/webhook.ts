@@ -16,6 +16,7 @@ import {
 import { runAgent, type Attachment } from "../agent/index.js";
 import { handleSetupMessage } from "./setup.js";
 import { handleCommand } from "./commands.js";
+import { canSend, recordSent, buildLimitReachedMessage, buildLowRemainingNote } from "../policies/sendLimit.js";
 
 const webhook = new Hono();
 
@@ -98,6 +99,14 @@ async function handleMessage(
     }
 
     if (action === "送信") {
+      const precheck = canSend(userId);
+      if (!precheck.allowed) {
+        await client.replyMessage({
+          replyToken: messageEvent.replyToken,
+          messages: [{ type: "text", text: buildLimitReachedMessage(precheck) }],
+        });
+        return;
+      }
       await client.replyMessage({
         replyToken: messageEvent.replyToken,
         messages: [{ type: "text", text: "メールを送信中..." }],
@@ -105,9 +114,12 @@ async function handleMessage(
       try {
         await sendReply(userId, pending.threadId, pending.toAddress, pending.subject, pending.draftContent);
         updatePendingReplyStatus(id, "sent");
+        recordSent(userId);
+        const after = canSend(userId);
+        const note = buildLowRemainingNote(after);
         await client.pushMessage({
           to: userId,
-          messages: [{ type: "text", text: "メールを送信しました。" }],
+          messages: [{ type: "text", text: `メールを送信しました。${note}` }],
         });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);

@@ -229,6 +229,10 @@ auth.get("/auth/callback", async (c) => {
 
     upsertUser(userId);
 
+    // OAuth 連携完了時にトライアル開始日をセット（未設定時のみ）
+    const { setTrialStartDateIfNull } = await import("../db/queries.js");
+    setTrialStartDateIfNull(userId, new Date().toISOString());
+
     const tokenJson = JSON.stringify(tokens);
     upsertGoogleAccount(userId, label, email, tokenJson, tokenJson);
 

@@ -156,15 +156,17 @@ export function upsertUser(
   displayName?: string,
   plan?: Plan,
 ): void {
+  // trial_start_date は OAuth 連携完了時に setTrialStartDateIfNull で設定するため、
+  // friend-add の upsertUser では touch しない
   getDb()
     .prepare(
-      `INSERT INTO users (user_id, display_name, plan, trial_start_date)
-       VALUES (?, ?, ?, ?)
+      `INSERT INTO users (user_id, display_name, plan)
+       VALUES (?, ?, ?)
        ON CONFLICT(user_id) DO UPDATE SET
          display_name = COALESCE(excluded.display_name, display_name),
          updated_at = CURRENT_TIMESTAMP`,
     )
-    .run(userId, displayName ?? null, plan ?? "trial", new Date().toISOString());
+    .run(userId, displayName ?? null, plan ?? "trial");
 }
 
 export function updateUserPlan(userId: string, plan: Plan): void {
@@ -199,11 +201,22 @@ export function getUser(userId: string): User | undefined {
         COALESCE(briefing_hour, 8) AS briefingHour,
         setup_stage AS setupStage,
         use_cases AS useCases,
+        stripe_customer_id AS stripeCustomerId,
+        stripe_subscription_id AS stripeSubscriptionId,
         created_at AS createdAt,
         updated_at AS updatedAt
       FROM users WHERE user_id = ?`,
     )
     .get(userId) as User | undefined;
+}
+
+/** trial_start_date が未設定のときだけセット（OAuth連携完了時に呼ぶ想定） */
+export function setTrialStartDateIfNull(userId: string, date: string): void {
+  getDb()
+    .prepare(
+      "UPDATE users SET trial_start_date = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ? AND trial_start_date IS NULL",
+    )
+    .run(date, userId);
 }
 
 export function updateDisplayName(userId: string, displayName: string): void {
@@ -280,6 +293,8 @@ export function getUserByStripeCustomerId(customerId: string): User | undefined 
         COALESCE(briefing_hour, 8) AS briefingHour,
         setup_stage AS setupStage,
         use_cases AS useCases,
+        stripe_customer_id AS stripeCustomerId,
+        stripe_subscription_id AS stripeSubscriptionId,
         created_at AS createdAt,
         updated_at AS updatedAt
        FROM users WHERE stripe_customer_id = ?`,

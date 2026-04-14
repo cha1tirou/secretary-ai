@@ -337,6 +337,38 @@ async function handleStatus(client: Client, userId: string, replyToken: string):
   });
 }
 
+/** 「ヘルプ」→ 使えるコマンド一覧 */
+async function handleHelp(client: Client, replyToken: string): Promise<void> {
+  const text = [
+    "📖 使い方ガイド",
+    "",
+    "━━ 基本 ━━",
+    "AIに話しかけるだけでOK。例：",
+    "・「今日の重要メール教えて」",
+    "・「田中さんに承諾の返信して」",
+    "・「来週の予定まとめて」",
+    "・「30分後に電話するってリマインドして」",
+    "",
+    "━━ コマンド一覧 ━━",
+    "「設定」: 呼び名・ブリーフィング時刻を変更",
+    "「プラン」: 有料プランを選ぶ",
+    "「使用量」: 今月の送信数を確認",
+    "「ステータス」: 現在のプラン・設定を確認",
+    "「解約」: 有料プランの解約・カード変更",
+    "「領収書」: 直近の請求書PDFリンク",
+    "「プロモ コード」: プロモコード適用",
+    "「ヘルプ」: このガイドを表示",
+    "",
+    "━━ ブリーフィング ━━",
+    "毎朝 設定した時刻（7/8/9時）にその日の要対応メールと予定を自動で送ります。",
+    "昼12時・夜18時にも差分をお届け。",
+  ].join("\n");
+  await client.replyMessage({
+    replyToken,
+    messages: [{ type: "text", text }],
+  });
+}
+
 /** メッセージがコマンドならハンドルして true を返す */
 export async function handleCommand(
   client: Client,
@@ -380,6 +412,11 @@ export async function handleCommand(
 
   if (trimmed === "ステータス") {
     await handleStatus(client, userId, replyToken);
+    return true;
+  }
+
+  if (trimmed === "ヘルプ" || trimmed === "help" || trimmed === "使い方") {
+    await handleHelp(client, replyToken);
     return true;
   }
 

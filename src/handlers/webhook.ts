@@ -17,6 +17,7 @@ import { runAgent, type Attachment } from "../agent/index.js";
 import { handleSetupMessage } from "./setup.js";
 import { handleCommand } from "./commands.js";
 import { canSend, recordSent, buildLimitReachedMessage, buildLowRemainingNote } from "../policies/sendLimit.js";
+import { ReauthRequiredError, sendReauthNotice } from "../integrations/auth.js";
 
 const webhook = new Hono();
 
@@ -160,6 +161,10 @@ async function handleMessage(
       messages: [{ type: "text", text: response }],
     });
   } catch (err) {
+    if (err instanceof ReauthRequiredError) {
+      await sendReauthNotice(userId);
+      return;
+    }
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[webhook] agent error:", err);
     await client.pushMessage({

@@ -9,6 +9,7 @@ import {
   getMonthlySendCount,
   getPlanLimit,
 } from "../db/queries.js";
+import { ReauthRequiredError, sendReauthNotice } from "../integrations/auth.js";
 import { runAgentRaw } from "../agent/index.js";
 import type { BriefingItem } from "../types.js";
 
@@ -147,7 +148,11 @@ async function sendBriefing(timeOfDay: TimeOfDay, hour?: number) {
         messages: [{ type: "text", text: finalMessage }],
       });
     } catch (err) {
-      console.error(`[briefing] error for ${user.lineUserId}:`, err);
+      if (err instanceof ReauthRequiredError) {
+        await sendReauthNotice(user.lineUserId);
+      } else {
+        console.error(`[briefing] error for ${user.lineUserId}:`, err);
+      }
     }
   }
 

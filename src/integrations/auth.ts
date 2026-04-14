@@ -272,24 +272,23 @@ export async function getAuthedClient(
   tokenField: "gmailToken" | "gcalToken",
   account?: GoogleAccount,
 ): Promise<InstanceType<typeof google.auth.OAuth2>> {
-  const { getUser, updateUserTokens } = await import("../db/queries.js");
+  const { getUser, updateUserTokens, upsertGoogleAccount } = await import("../db/queries.js");
+
+  // account 未指定なら google_accounts の先頭を採用（読み書きの経路を統一）
+  let resolvedAccount: GoogleAccount | null = account ?? null;
+  if (!resolvedAccount) {
+    const accounts = getGoogleAccountsByUserId(userId);
+    resolvedAccount = accounts[0] ?? null;
+  }
 
   let raw: string | null = null;
-
-  if (account) {
-    raw = account[tokenField];
+  if (resolvedAccount) {
+    raw = resolvedAccount[tokenField];
   } else {
-    // google_accounts から最初のアカウントを探す
-    const accounts = getGoogleAccountsByUserId(userId);
-    if (accounts.length > 0 && accounts[0]) {
-      raw = accounts[0][tokenField];
-    }
-    // フォールバック: users テーブルから取得
-    if (!raw) {
-      const user = getUser(userId);
-      if (!user) throw new Error(`User not found: ${userId}`);
-      raw = user[tokenField];
-    }
+    // google_accounts が空のレガシーユーザー: users テーブルを参照
+    const user = getUser(userId);
+    if (!user) throw new Error(`User not found: ${userId}`);
+    raw = user[tokenField];
   }
 
   if (!raw) throw new Error(`No ${tokenField} for user ${userId}. Run /auth/start first.`);
@@ -298,19 +297,28 @@ export async function getAuthedClient(
   const oauth2Client = createOAuth2Client();
   oauth2Client.setCredentials(tokens);
 
-  // 期限切れならrefresh
   const expiry = tokens.expiry_date as number | undefined;
   if (expiry && expiry < Date.now() + 60_000) {
-    console.log("[auth] token expired, refreshing");
+    console.log(`[auth] token expired, refreshing (${userId}, ${tokenField})`);
     try {
       const { credentials } = await oauth2Client.refreshAccessToken();
-      oauth2Client.setCredentials(credentials);
-      const updated = JSON.stringify(credentials);
+      // Google の refresh 応答には refresh_token が含まれないことが多いので、
+      // 既存トークンにマージして保持
+      const merged = { ...tokens, ...credentials };
+      oauth2Client.setCredentials(merged);
+      const updated = JSON.stringify(merged);
 
-      // google_accounts を更新
-      if (account) {
-        const { upsertGoogleAccount } = await import("../db/queries.js");
-        upsertGoogleAccount(account.userId, account.label, account.email, updated, updated);
+      if (resolvedAccount) {
+        // 対象アカウントの読み込んだ field のみ更新（もう片方のトークンを壊さない）
+        const gmail = tokenField === "gmailToken" ? updated : resolvedAccount.gmailToken ?? updated;
+        const gcal = tokenField === "gcalToken" ? updated : resolvedAccount.gcalToken ?? updated;
+        upsertGoogleAccount(
+          resolvedAccount.userId,
+          resolvedAccount.label,
+          resolvedAccount.email,
+          gmail,
+          gcal,
+        );
       } else {
         updateUserTokens(userId, { [tokenField]: updated } as {
           gmailToken?: string;
@@ -330,6 +338,40 @@ export async function getAuthedClient(
   }
 
   return oauth2Client;
+}
+
+/**
+ * ReauthRequiredError 発生時、LINE でユーザーに再連携を促す
+ * 失敗しても握りつぶす（通知のベストエフォート）
+ */
+export async function sendReauthNotice(userId: string): Promise<void> {
+  try {
+    const { messagingApi } = await import("@line/bot-sdk");
+    const client = new messagingApi.MessagingApiClient({
+      channelAccessToken: process.env["LINE_CHANNEL_ACCESS_TOKEN"] ?? "",
+    });
+    const baseUrl = (process.env["GOOGLE_REDIRECT_URI"] ?? "")
+      .replace("/auth/callback", "")
+      || process.env["APP_BASE_URL"]
+      || "https://ai-hisho.net";
+    const authUrl = `${baseUrl}/auth/start?user=${userId}&label=${encodeURIComponent("アカウント1")}`;
+    await client.pushMessage({
+      to: userId,
+      messages: [{
+        type: "text",
+        text: [
+          "⚠️ Google連携の再承認が必要です",
+          "",
+          "（パスワード変更やアクセス取り消しなどで連携が切れました）",
+          "",
+          "👇こちらから再連携をお願いします",
+          authUrl,
+        ].join("\n"),
+      }],
+    });
+  } catch (err) {
+    console.warn("[auth] sendReauthNotice failed:", err);
+  }
 }
 
 export { auth, createOAuth2Client, SCOPES };

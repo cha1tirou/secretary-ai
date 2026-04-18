@@ -4,7 +4,7 @@
 
 LINEで動くAI秘書。Gmail・Google Calendarと連携し、メール管理・予定管理・タスク管理を自動化する。
 
-- **対象**: ビジネスパーソン（メール・予定管理に時間を使いたくない人）
+- **対象**: 忙しい個人事業主・フリーランス・スタートアップ社員（30代）。1日50通以上のメールを受信し、LINEを日常的に使うビジネスパーソン。
 - **UI**: LINE（メイン）+ Webダッシュボード（メール返信・タスク管理）
 - **ステータス**: α版（テストユーザー限定）
 
@@ -168,9 +168,9 @@ LINEで動くAI秘書。Gmail・Google Calendarと連携し、メール管理・
 
 | 項目 | 詳細 |
 |---|---|
-| プロジェクト | mitsumori-maker |
-| スコープ | gmail.readonly, gmail.send, calendar, userinfo.email |
-| ステータス | テスト段階（テストユーザー手動追加が必要） |
+| プロジェクト | secretary-ai（ID: secretary-ai-492700） |
+| スコープ | gmail.readonly, gmail.send, calendar.events, userinfo.email |
+| ステータス | Google審査申請済み（2026-04-18提出） |
 | コールバックURL | {BASE_URL}/auth/callback |
 | トークン保存先 | google_accountsテーブル |
 | リフレッシュ | 期限60秒前に自動実行 |

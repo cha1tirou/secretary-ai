@@ -722,6 +722,37 @@ img { max-width: 100%; display: block; }
 .cta-section .section-title { margin-bottom: 16px; }
 .cta-section .section-desc { margin-bottom: 48px; }
 
+/* ── FAQ ── */
+.faq-list {
+  max-width: 680px;
+  margin: 0 auto;
+}
+.faq-item {
+  border-bottom: 1px solid var(--border);
+  padding: 24px 0;
+}
+.faq-q {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 10px;
+  color: var(--white);
+}
+.faq-q::before {
+  content: 'Q. ';
+  color: var(--green);
+}
+.faq-a {
+  font-size: 14px;
+  color: var(--gray-light);
+  line-height: 1.9;
+  font-weight: 300;
+}
+.faq-a::before {
+  content: 'A. ';
+  color: var(--green);
+  font-weight: 700;
+}
+
 /* ── Footer ── */
 footer {
   border-top: 1px solid var(--border);
@@ -828,6 +859,7 @@ footer a:hover { color: var(--white); }
         LINE友達追加で無料スタート
       </a>
       <p class="hero-note fade-in fade-in-delay-4">登録不要・無料ではじめられます</p>
+      <p class="hero-note fade-in fade-in-delay-4" style="margin-top: 6px; font-size: 12px; color: #64748b;">※ Gmail・Googleカレンダーをお使いの方向けのサービスです</p>
     </div>
   </div>
 </section>
@@ -1032,6 +1064,18 @@ footer a:hover { color: var(--white); }
     LINE友達追加で無料スタート
   </a>
   <p class="hero-note fade-in fade-in-delay-2">登録不要・無料ではじめられます</p>
+</section>
+
+<!-- FAQ -->
+<section class="section-pad" style="padding-top: 0;">
+  <p class="section-label fade-in">FAQ</p>
+  <h2 class="section-title fade-in">よくある質問</h2>
+  <div class="faq-list">
+    <div class="faq-item fade-in">
+      <p class="faq-q">どのメール・カレンダーサービスに対応していますか？</p>
+      <p class="faq-a">現在はGmail（Googleアカウント）とGoogleカレンダーのみに対応しています。OutlookやYahooメール等には現時点では対応していません。</p>
+    </div>
+  </div>
 </section>
 
 <!-- Footer -->

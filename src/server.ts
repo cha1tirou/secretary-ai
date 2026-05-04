@@ -7,10 +7,12 @@ import { initDb, getUser } from "./db/queries.js";
 import { webhook } from "./handlers/webhook.js";
 import { runAgent } from "./agent/index.js";
 import { auth } from "./integrations/auth.js";
-import { startBriefing } from "./cron/briefing.js";
-import { startTimerCron } from "./cron/timer.js";
-import { startEmailWatchCron } from "./cron/emailWatch.js";
-import { startReminderCron } from "./cron/reminders.js";
+// cron系は API 課金抑制のため全停止中（再開時はコメント解除）
+// import { startBriefing } from "./cron/briefing.js";
+// import { startTimerCron } from "./cron/timer.js";
+// import { startEmailWatchCron } from "./cron/emailWatch.js";
+// import { startReminderCron } from "./cron/reminders.js";
+// import { startRetentionCron } from "./cron/retention.js";
 import { stripeWebhook } from "./handlers/stripe.js";
 import { admin } from "./handlers/admin.js";
 
@@ -23,11 +25,12 @@ mkdirSync(dirname(dbPath), { recursive: true });
 // DB初期化
 initDb();
 
-// cron起動
-startBriefing();
-startTimerCron();
-startEmailWatchCron();
-startReminderCron();
+// cron起動（API 課金抑制のため全停止中）
+// startBriefing();
+// startTimerCron();
+// startEmailWatchCron();
+// startReminderCron();
+// startRetentionCron();
 
 // ヘルスチェック
 app.get("/health", (c) => c.json({ status: "ok" }));
